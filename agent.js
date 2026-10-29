@@ -14,13 +14,19 @@ const http = require('http');
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
+const os = require('os');
 const vm = require('vm');
 const { URL } = require('url');
 
 const ROOT = __dirname;
 const SITE = path.join(ROOT, 'site');
 const PORT = Number(process.env.PORT || 8099);
-const KEY_FILE = path.join(ROOT, '_agent.key');
+/* 部署环境一定会注入 PORT。本机双击 start.bat 时不设，于是只听 127.0.0.1。 */
+const DEPLOY = !!process.env.PORT;
+/* 密钥可以在两个地方：项目里的 _agent.key（本机），或者用户目录下的 ~/.buffett-agent.key。
+   推荐放用户目录 —— 项目目录要打包、要发布，多一个千载难逢的泄密口就多一分风险。 */
+const KEY_FILES = [path.join(ROOT, '_agent.key'), path.join(os.homedir(), '.buffett-agent.key')];
+const KEY_FILE = KEY_FILES[0];
 const MEM_FILE = path.join(ROOT, 'agent-memory.json');
 const DEEPSEEK = 'https://api.deepseek.com/chat/completions';
 const MAX_ROUNDS = 6;
@@ -553,9 +559,10 @@ function getSession(id) {
 }
 
 async function runAgent(ctx) {
-  const { message, session, model, web, emit } = ctx;
-  const apiKey = await getKey();
-  if (!apiKey) throw new Error('本机没有配置 DeepSeek 密钥（把它写进 ' + KEY_FILE + '，或设置环境变量 DEEPSEEK_API_KEY）');
+  const { message, session, model, web, emit, key } = ctx;
+  const apiKey = await getKey(key);
+  if (!apiKey) throw new Error('这台机器上没有配置 DeepSeek 密钥。本机用就写进 ' +
+    KEY_FILES.join(' 或 ') + '；公网实例请在页面上填你自己的密钥。');
 
   const mem = await readMemory();
   const tools = web ? TOOLS : TOOLS.filter(t => t.function.name !== 'web_search' && t.function.name !== 'open_url');
@@ -642,13 +649,30 @@ async function runAgent(ctx) {
   return { rounds: rounds, calls: calls, usage: final.usage };
 }
 
+/* 服务端自带的密钥。有它，就是「本机模式」：谁来都不用填密钥，也只花主人的钱。 */
 let _keyCache = null;
-async function getKey() {
+async function serverKey() {
   if (_keyCache) return _keyCache;
   if (process.env.DEEPSEEK_API_KEY) { _keyCache = process.env.DEEPSEEK_API_KEY.trim(); return _keyCache; }
-  try { _keyCache = (await fsp.readFile(KEY_FILE, 'utf8')).trim(); return _keyCache; }
-  catch (e) { return null; }
+  for (const f of KEY_FILES) {
+    try {
+      const v = (await fsp.readFile(f, 'utf8')).trim();
+      if (v) { _keyCache = v; return _keyCache; }
+    } catch (e) {}
+  }
+  return null;
 }
+/* 没有自带密钥时（比如发布到公网的实例），允许访问者带自己的密钥来用。
+   自带密钥存在时一律忽略访问者的 —— 否则别人能蹭主机的额度。
+   顺手做一次格式检查，免得把乱七八糟的字符串当密钥转发给上游。 */
+function looksLikeKey(s) { return /^sk-[A-Za-z0-9\-_]{16,}$/.test(String(s || '').trim()); }
+async function getKey(byo) {
+  const own = await serverKey();
+  if (own) return own;
+  if (byo && looksLikeKey(byo)) return String(byo).trim();
+  return null;
+}
+function keyMode() { return _keyCache || process.env.DEEPSEEK_API_KEY ? 'builtin' : 'byo'; }
 
 /* ---------------- HTTP ---------------- */
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -672,8 +696,10 @@ const server = http.createServer(async (req, res) => {
       return emitSSE(res, q);
     }
     if (u.pathname === '/api/health') {
-      const key = await getKey();
-      return json(res, 200, { ok: true, key: !!key, docs: DOCS.length, letters: C.meta.letters, models: ['deepseek-v4-pro', 'deepseek-flash'] });
+      const own = await serverKey();
+      /* keyMode: builtin=服务端自带密钥（本机）；byo=没有，访问者要填自己的（公网实例） */
+      return json(res, 200, { ok: true, key: !!own, keyMode: own ? 'builtin' : 'byo',
+        docs: DOCS.length, letters: C.meta.letters, models: ['deepseek-v4-pro', 'deepseek-flash'] });
     }
     if (u.pathname === '/api/memory') {
       if (req.method === 'DELETE') { await fsp.writeFile(MEM_FILE, JSON.stringify({ notes: [] }, null, 1), 'utf8'); return json(res, 200, { ok: true }); }
@@ -713,6 +739,7 @@ function emitSSE(res, q) {
         /* 默认走快的那个：坐着聊天等 40 秒太长。想要更细的推理再选 pro。 */
         model: q.model === 'pro' ? 'deepseek-v4-pro' : 'deepseek-flash',
         web: q.web !== false,
+        key: String(q.key || '').slice(0, 120),
         emit: emit
       });
       emit('done', info);
@@ -724,12 +751,16 @@ function emitSSE(res, q) {
   })();
 }
 
-server.listen(PORT, '127.0.0.1', () => {
-  const hasKey = !!(process.env.DEEPSEEK_API_KEY || fs.existsSync(KEY_FILE));
+/* 绑定地址：本机跑只听 127.0.0.1（外人碰不到你的密钥）；
+   发布到线上时运行环境会注入 PORT，那时必须听 0.0.0.0，否则反代连不上。
+   线上实例没有自带密钥，走访问者自带密钥，也不存在蹭额度的问题。 */
+server.listen(PORT, DEPLOY ? '0.0.0.0' : '127.0.0.1', async () => {
+  /* 这里必须真去读一次密钥：keyMode() 只看缓存，启动时缓存还是空的，会误报「未配置」 */
+  const hasKey = !!(await serverKey());
   console.log('');
   console.log('「巴菲特午餐会」Agent 已就绪');
-  console.log('  打开： http://127.0.0.1:' + PORT + '/index.html#/talk');
+  console.log('  打开： http://' + (DEPLOY ? '<线上域名>' : '127.0.0.1:' + PORT) + '/index.html#/talk');
   console.log('  语料： ' + DOCS.length + ' 段 / ' + C.meta.letters + ' 封信 / ' + Math.round(C.meta.chars / 10000) + ' 万字');
-  console.log('  密钥： ' + (hasKey ? '已配置' : '缺失 —— 请把密钥写进 ' + KEY_FILE));
+  console.log('  密钥： ' + (hasKey ? '本机已配置' : '未配置 —— 访问者需在页面上填自己的密钥'));
   console.log('');
 });

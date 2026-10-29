@@ -568,6 +568,18 @@ a.noyr{text-decoration:none;pointer-events:none}
   margin:0 0 2px;padding-bottom:8px;flex-wrap:wrap;background:var(--bg)}
 .tp-opts label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
 .tp-opts input[type=checkbox]{accent-color:var(--gold);cursor:pointer}
+.tp-keybtn{background:none;border:1px solid var(--line2);color:var(--ink2);font-size:11.8px;
+  padding:4px 10px;border-radius:6px;cursor:pointer;font-family:var(--sans)}
+.tp-keybtn:hover{border-color:var(--gold);color:var(--gold)}
+.tp-keyrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 4px;
+  padding:10px 12px;border:1px solid var(--line2);border-radius:8px;background:var(--bg2)}
+.tp-keyrow input{flex:1 1 240px;min-width:170px;padding:7px 10px;font-size:12.5px;
+  border:1px solid var(--line2);border-radius:6px;background:var(--bg);color:var(--text);
+  font-family:ui-monospace,Consolas,monospace}
+.tp-keysave,.tp-keyclr{font-size:12px;padding:7px 12px;border-radius:6px;cursor:pointer;font-family:var(--sans)}
+.tp-keysave{background:var(--gold);color:#fff;border:none;font-weight:600}
+.tp-keyclr{background:none;border:1px solid var(--line2);color:var(--ink3)}
+.tp-keyhint{font-size:11px;color:var(--ink3);flex:1 1 100%;line-height:1.7}
 .tp-stop{background:transparent;border:1px solid var(--line2);color:var(--ink2);border-radius:8px;
   padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)}
 .tp-stop:hover{border-color:#C0392B;color:#C0392B}
@@ -1985,7 +1997,11 @@ function fmtSrcs(list){
 
 /* 本地服务的地址：页面如果就是它自己托管的，用相对路径；
    双击 html（file://）打开的，就直奔 127.0.0.1:8099。 */
-var TM = { online: null, base: '', model: 'flash', web: true, ctrl: null, probing: false };
+var TM = { online: null, base: '', mode: 'builtin', model: 'flash', web: true, ctrl: null, probing: false };
+/* 访问者自带密钥：公网实例上服务端没有密钥，谁用谁填自己的，只存在这台浏览器里。
+   本机实例服务端自带密钥，这个值是空的，也不会被发出去。 */
+var TKEY = '';
+try { TKEY = localStorage.getItem('BUFFETT_DS_KEY') || ''; } catch (e) { TKEY = ''; }
 function talkBase(){
   if (TM.base) return TM.base;
   TM.base = (location.protocol === 'http:' || location.protocol === 'https:') ? '' : 'http://127.0.0.1:8099';
@@ -2005,7 +2021,13 @@ function talkProbe(){
     var b = tries[n++];
     return fetch(b + '/api/health', { cache: 'no-store' }).then(function(r){ return r.json(); })
       .then(function(j){
-        if (j && j.ok && j.key){ TM.base = b; TM.online = true; if (route() === '/talk') talkUpdateState(); return true; }
+        /* 服务端自带密钥（本机）是 builtin；公网实例没有密钥，是 byo（访问者自带），
+           两种都算「服务活着」，只是第二种要先填密钥才能问。 */
+        if (j && j.ok && (j.key || j.keyMode === 'byo')){
+          TM.base = b; TM.online = true; TM.mode = j.keyMode || 'builtin';
+          if (route() === '/talk') talkUpdateState();
+          return true;
+        }
         return attempt();
       })
       .catch(function(){ return attempt(); });
@@ -2021,14 +2043,19 @@ function talkProbe(){
 /* 探活是异步的，结果回来时不能整页 render：那会把别人手里正在点的链接换成 0×0 的幽灵
    （全站审计就是这么报出一条「#/talk 上的返回链接尺寸为 0」）。只改那两处文字。 */
 function talkStateText(){
-  return TM.online === true ? '已连接本地 Agent'
-    : TM.online === null ? '正在探活…' : '离线模式（关键词检索）';
+  if (TM.online === null) return '正在探活…';
+  if (TM.online !== true) return '离线模式（关键词检索）';
+  return TM.mode === 'byo' ? (TKEY ? '已就绪 · 用你自己的密钥' : '待填密钥')
+    : '已连接本地 Agent';
 }
 function talkHeroP(){
-  if (TM.online === true) return '这是个会自己去查资料的 agent：他会在 98 封信里翻找，必要时上网核实，' +
-    '每句话都标出来处。不知道问什么？试试这些话题';
   if (TM.online === null) return '正在连本地 Agent 服务…';
-  return '本地 Agent 服务没起来，现在是关键词检索模式。<br>想让他真会查资料、会联网，双击项目里的 <b>start.bat</b>。';
+  if (TM.online !== true) return '本地 Agent 服务没起来，现在是关键词检索模式。<br>想让他真会查资料、会联网，双击项目里的 <b>start.bat</b>。';
+  if (TM.mode === 'byo') return '这是个会自己去查资料的 agent：他会在 98 封信里翻找，必要时上网核实，' +
+    '每句话都标出来处。<br>这个站点没有内置密钥，请先在下面填你自己的 DeepSeek 密钥' +
+    '（只存在你自己浏览器里，随请求发给本机服务，不落盘）。';
+  return '这是个会自己去查资料的 agent：他会在 98 封信里翻找，必要时上网核实，' +
+    '每句话都标出来处。不知道问什么？试试这些话题';
 }
 function talkUpdateState(){
   var s = document.querySelector('.tp-state');
@@ -2042,6 +2069,7 @@ function talkUpdateState(){
 
 function talkPage(){
   var online = TM.online === true;
+  var byo = online && TM.mode === 'byo';
   var body = TALK.msgs.length ? talkMsgs()
     : '<div class="tp-hero"><div class="tp-cup">' + cupSVG(46) + '</div>' +
       '<p>' + talkHeroP() + '</p><div class="tp-topics">' + talkTopics() + '</div></div>';
@@ -2062,8 +2090,16 @@ function talkPage(){
       '<div class="tp-opts">' +
         '<label><input type="checkbox" id="talk-web"' + (TM.web ? ' checked' : '') + '> 允许联网核实（信件之外的事才用）</label>' +
         '<label><input type="checkbox" id="talk-pro"' + (TM.model === 'pro' ? ' checked' : '') + '> 深思模式（更慢、更细）</label>' +
+        (byo ? '<button class="tp-keybtn" id="talk-keybtn">' + (TKEY ? '已填密钥 · 更换' : '填我的 DeepSeek 密钥') + '</button>' : '') +
         '<button class="tp-stop" id="talk-stop" style="display:none">停止</button>' +
       '</div>' +
+      /* 公网实例没有内置密钥，谁用谁填自己的：只存在这台浏览器，随请求发给服务端，服务端不落盘 */
+      (byo ? '<div class="tp-keyrow" id="talk-keyrow" style="display:none">' +
+        '<input id="talk-keyin" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" value="' + esc(TKEY) + '">' +
+        '<button class="tp-keysave" id="talk-keysave">保存</button>' +
+        '<button class="tp-keyclr" id="talk-keyclr">清除</button>' +
+        '<span class="tp-keyhint">密钥存在这台浏览器的本地存储里，只发给这个站点的服务端，不写入服务器磁盘。</span>' +
+      '</div>' : '') +
     '</div>' +
     '<p class="tp-note">回答基于巴菲特公开信件整理，不构成任何投资建议。' +
       (online ? '每条引文都能点回原信。' : '离线模式只在字面上匹配原文，不含推理。') + '</p>' +
@@ -2090,6 +2126,16 @@ function talkAsk(q){
     talkProbe();
     /* 探活是异步的，先把这次当离线答；下次进来就是 agent 了 */
     talkLocalFallback(q, idx);
+    return;
+  }
+  /* 公网实例上服务端没有密钥，必须由访问者提供，否则这一问只会换来一条报错 */
+  if (TM.mode === 'byo' && !TKEY){
+    TALK.msgs[idx] = { r: 'b', h: '<p>这个站点没有内置密钥，请先点下面的「填我的 DeepSeek 密钥」，' +
+      '把你自己的密钥粘进来（只存在你这台浏览器里）。</p>' +
+      '<p>没有密钥也可以到 <a href="https://platform.deepseek.com">platform.deepseek.com</a> 申请，' +
+      '新账号有免费额度。</p>' };
+    TALK.busy = false;
+    if (route() === '/talk'){ render(); talkScroll(); }
     return;
   }
   talkStream(q, idx);
@@ -2150,7 +2196,8 @@ function talkStream(q, idx){
   fetch(talkBase() + '/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: q, session: TALK.session, web: TM.web, model: TM.model }),
+    body: JSON.stringify({ message: q, session: TALK.session, web: TM.web, model: TM.model,
+      key: TM.mode === 'byo' ? TKEY : '' }),
     signal: TM.ctrl ? TM.ctrl.signal : undefined
   }).then(function(res){
     if (!res.ok) throw new Error('本地服务返回 ' + res.status);
@@ -2315,6 +2362,40 @@ function bind(){
       }).catch(function(){
         tf.parentNode.innerHTML = '清不掉（本地服务没起来），记忆还在 agent-memory.json 里。';
       });
+    };
+    /* 访问者自带密钥：只有公网实例（服务端没密钥）才会出现这几个控件 */
+    var kb = document.getElementById('talk-keybtn');
+    if (kb) kb.onclick = function(){
+      var row = document.getElementById('talk-keyrow');
+      if (row) row.style.display = (row.style.display === 'none') ? 'flex' : 'none';
+    };
+    var ks = document.getElementById('talk-keysave');
+    if (ks) ks.onclick = function(){
+      var v = (document.getElementById('talk-keyin') || {}).value || '';
+      v = v.trim();
+      if (!/^sk-[A-Za-z0-9\-_]{16,}$/.test(v)){
+        var hint = document.querySelector('.tp-keyhint');
+        if (hint) hint.textContent = '这串看着不像 DeepSeek 密钥（应以 sk- 开头）。';
+        return;
+      }
+      TKEY = v;
+      try { localStorage.setItem('BUFFETT_DS_KEY', v); } catch (e) {}
+      kb.textContent = '已填密钥 · 更换';
+      var h2 = document.querySelector('.tp-keyhint');
+      if (h2) h2.textContent = '已保存到这台浏览器。随时可以清除。';
+      var row2 = document.getElementById('talk-keyrow');
+      if (row2) row2.style.display = 'none';
+      talkUpdateState();
+    };
+    var kc = document.getElementById('talk-keyclr');
+    if (kc) kc.onclick = function(){
+      TKEY = '';
+      try { localStorage.removeItem('BUFFETT_DS_KEY'); } catch (e) {}
+      var ki = document.getElementById('talk-keyin'); if (ki) ki.value = '';
+      kb.textContent = '填我的 DeepSeek 密钥';
+      var h3 = document.querySelector('.tp-keyhint');
+      if (h3) h3.textContent = '已从这台浏览器清除。';
+      talkUpdateState();
     };
   }
   document.querySelectorAll('.yr').forEach(function(el){
