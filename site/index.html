@@ -1,0 +1,2631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>读巴菲特 · 1956–2025 股东信知识库</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#FAF7F2;--bg2:#F3EDE4;--panel:#FFFFFF;--card:#FFFFFF;
+  --text:#1B1B18;--ink:#1B1B18;--ink2:#6B6560;--ink3:#9A938A;
+  --gold:#B8860B;--gold-light:#D4A843;--gold-glow:rgba(184,134,11,.12);
+  --navy:#1A2332;--navy-light:#2C3E50;--cream:#FFF8EE;
+  --border:#E0D6C8;--line:#E0D6C8;--line2:#D3C6B4;
+  --accent:#B8860B;--accent-soft:#FFF8EE;--link:#8B5E0B;
+  --hit:#3b6d11;--hit-soft:#eaf3de;--miss:#a32d2d;--miss-soft:#fceaea;
+  --mix:#854f0b;--mix-soft:#faeeda;
+  --serif:'Noto Serif SC','Source Han Serif SC','Songti SC','STZhongsong','STSong',Georgia,'Times New Roman',serif;
+  --sans:'DM Sans',-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+  --sidebar-w:260px;--radius:12px;
+}
+html{font-size:15px;scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--text);background:var(--bg);
+  line-height:1.8;min-height:100vh;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--link);text-decoration:none}
+img{max-width:100%}
+
+/* ===== 侧栏 ===== */
+.sidebar{width:var(--sidebar-w);background:var(--navy);position:fixed;top:0;left:0;bottom:0;
+  overflow:hidden;z-index:100;display:flex;flex-direction:column;transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.sidebar-header{padding:20px 16px 16px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}
+.logo{color:#fff;font-size:17px;font-weight:700;text-decoration:none;letter-spacing:.5px;
+  font-family:var(--serif);display:inline-flex;align-items:center;gap:10px}
+.logo-icon{width:28px;height:28px;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
+.logo small{display:block;font-size:10px;font-weight:400;color:rgba(255,255,255,.42);
+  letter-spacing:1.4px;margin-top:2px;font-family:var(--sans)}
+.sidebar-nav{flex:1;min-height:0;padding:8px 0 22px;overflow-y:auto}
+.sidebar-nav::-webkit-scrollbar{width:4px}
+.sidebar-nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:2px}
+.nav-link{display:block;padding:6px 16px;color:#cbd5e1;text-decoration:none;font-size:13px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid transparent;transition:all .15s}
+.nav-link:hover{background:rgba(255,255,255,.06);color:#fff;text-decoration:none}
+.nav-link.active{color:#fff;background:rgba(184,134,11,.15);border-left-color:var(--gold);font-weight:600}
+.nav-home{font-size:14px;padding:10px 16px;font-weight:500;margin-bottom:4px}
+.nav-talk{font-size:13.5px;font-weight:600;color:#F0D9A0;margin-bottom:6px}
+.nav-talk:hover{color:#fff}
+.nav-group{margin-bottom:2px}
+.nav-group-title{padding:8px 16px;color:#cbd5e1;font-size:12px;font-weight:600;
+  letter-spacing:.5px;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;transition:color .15s}
+.nav-group-title:hover{color:#fff}
+.caret{display:inline-block;width:0;height:0;border-left:5px solid #cbd5e1;border-top:4px solid transparent;
+  border-bottom:4px solid transparent;transition:transform .2s;flex-shrink:0}
+.nav-group-title.open .caret{transform:rotate(90deg);border-left-color:#fff}
+.badge{margin-left:auto;background:rgba(255,255,255,.1);color:#cbd5e1;font-size:11px;
+  padding:1px 6px;border-radius:8px;font-weight:400;flex-shrink:0}
+.nav-group-items{display:none;padding-left:8px}
+.nav-group-items.open{display:block}
+.hamburger{display:none;position:fixed;top:12px;left:12px;z-index:200;background:var(--navy);
+  color:#fff;border:none;font-size:20px;padding:6px 11px;border-radius:6px;cursor:pointer;line-height:1}
+.scrim{display:none;position:fixed;inset:0;background:rgba(20,26,38,.45);z-index:99}
+.scrim.on{display:block}
+
+/* ===== 侧栏搜索 ===== */
+.search-box{padding:8px 12px;position:relative}
+.search-box input{width:100%;padding:7px 10px;border:1px solid rgba(255,255,255,.15);border-radius:6px;
+  background:rgba(255,255,255,.08);color:#fff;font-size:13px;outline:none;font-family:var(--sans)}
+.search-box input::placeholder{color:rgba(255,255,255,.4)}
+.search-box input:focus{border-color:var(--gold);background:rgba(255,255,255,.12)}
+#qres{display:none;position:absolute;left:12px;right:12px;top:100%;z-index:300;
+  background:#1e293b;border:1px solid rgba(255,255,255,.12);border-radius:8px;
+  max-height:70vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+#qres.on{display:block}
+.sr-item{display:block;padding:9px 12px;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.06);transition:background .1s}
+.sr-item:last-child{border-bottom:none}
+.sr-item:hover{background:rgba(184,134,11,.16)}
+.sr-title{color:#fff;font-size:13px;font-weight:600;margin-right:6px}
+.sr-type{font-size:10.5px;padding:1px 6px;border-radius:4px;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1)}
+.sr-snippet{display:block;font-size:12px;color:rgba(255,255,255,.52);margin-top:3px;line-height:1.55;
+  overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sr-snippet mark{background:rgba(212,168,67,.55);color:#fff;font-weight:600;border-radius:2px;padding:0 2px}
+.sr-empty{padding:16px;text-align:center;color:rgba(255,255,255,.4);font-size:13px}
+.sr-all{display:block;padding:9px 12px;margin-top:4px;border-top:1px solid rgba(255,255,255,.1);font-size:12.5px;color:#d4a843!important;text-decoration:none}
+.sr-all:hover{background:rgba(255,255,255,.06)}
+
+/* ===== 主区 ===== */
+.main{margin-left:max(var(--sidebar-w),calc((100vw - 1160px)/2));max-width:1160px;
+  min-height:100vh;position:relative;display:flex;flex-direction:column}
+.main::after{content:'';position:fixed;top:0;left:var(--sidebar-w);right:0;bottom:0;
+  pointer-events:none;opacity:.022;z-index:999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+#app{flex:1;min-width:0}
+#app.app-home{padding:0 0 24px}
+#app.app-page{max-width:980px;margin:0 auto;padding:40px 40px 56px;width:100%}
+#app.app-read{max-width:1160px;padding:40px 48px 56px}
+#boot{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.boot-inner{text-align:center;font-size:14px;color:var(--ink2);line-height:1.7}
+.boot-inner small{display:block;margin-top:10px;font-size:12px;color:var(--ink3)}
+.boot-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);
+  margin-right:9px;vertical-align:1px;animation:bpop 1.1s infinite ease-in-out}
+@keyframes bpop{0%,100%{opacity:.25;transform:scale(.75)}50%{opacity:1;transform:scale(1)}}
+.sitefoot{border-top:1px solid var(--border);padding:20px 48px 30px;font-size:12px;
+  color:var(--ink3);line-height:1.95;background:transparent}
+.sitefoot b{color:var(--ink2);font-weight:600}
+.sitefoot a{color:var(--gold)}
+.sitefoot a:hover{text-decoration:underline}
+
+/* ===== 首页 HERO ===== */
+.hero-section{position:relative;padding:44px 48px 26px;max-width:900px;margin:0 auto}
+.hero-row{display:flex;align-items:center;gap:28px}
+.hero-text{min-width:0}
+.hero-logo{display:block;width:clamp(76px,9vw,104px);height:auto;flex-shrink:0;
+  opacity:0;animation:fadeUp .6s ease forwards;filter:drop-shadow(0 2px 8px rgba(184,134,11,.15))}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:14px;
+  opacity:0;animation:fadeUp .6s ease forwards}
+.hero-eyebrow::before{content:'';width:24px;height:1px;background:var(--gold)}
+.hero-title{font-family:var(--serif);font-size:clamp(28px,4.4vw,42px);font-weight:900;
+  line-height:1.25;letter-spacing:-.3px;color:var(--navy);margin-bottom:4px;
+  opacity:0;animation:fadeUp .6s ease .1s forwards}
+.hero-title .gold{color:var(--gold);margin-left:.14em}
+.hero-title h1{display:inline;font:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}
+.hero-version{display:inline-block;font-size:12px;padding:3px 10px;background:var(--gold);color:#fff;margin-left:12px;vertical-align:middle;
+  border-radius:6px;font-weight:700;font-family:var(--sans);vertical-align:middle;position:relative;top:-4px;
+  margin-left:8px;text-decoration:none;transition:all .2s;letter-spacing:1px}
+.hero-version:hover{background:#9A7209;transform:translateY(-1px)}
+.hero-by{font-size:14px;font-family:var(--sans);font-weight:500;color:var(--text2);
+  vertical-align:middle;position:relative;top:-2px;margin-left:6px}
+.hero-sub{font-size:16px;color:var(--ink2);line-height:1.75;margin-top:10px;max-width:660px;
+  font-family:var(--serif);font-weight:400;opacity:0;animation:fadeUp .6s ease .2s forwards}
+.hero-sub b{color:var(--navy);font-weight:700}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ===== 首页 数字条 ===== */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;max-width:900px;margin:0 auto 30px;
+  padding:0 48px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  opacity:0;animation:fadeUp .6s ease .3s forwards}
+.stat-item{text-align:center;padding:18px 12px;position:relative;transition:background .3s;text-decoration:none;color:inherit}
+.stat-item:not(:last-child)::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:var(--border)}
+.stat-item:hover{background:var(--gold-glow)}
+.stat-num{font-family:var(--serif);font-size:36px;font-weight:900;color:var(--navy);line-height:1;margin-bottom:4px;letter-spacing:-1px}
+.stat-label{font-size:12px;color:var(--ink2);font-weight:500;letter-spacing:.5px}
+.main-inner{max-width:900px;padding:0 48px 20px;margin:0 auto}
+
+/* ===== 首页 导航卡 ===== */
+.nav-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:30px;
+  opacity:0;animation:fadeUp .6s ease .4s forwards}
+.nav-cards.nav-cards-5{grid-template-columns:repeat(5,1fr)}
+.nav-card{position:relative;padding:20px 16px 18px;background:var(--card);border:1px solid var(--border);
+  border-radius:12px;text-decoration:none;transition:all .3s cubic-bezier(.4,0,.2,1);overflow:hidden;color:var(--text)}
+.nav-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold);opacity:0;transition:opacity .3s}
+.nav-card:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.08);border-color:var(--gold-light);text-decoration:none}
+.nav-card:hover::before{opacity:1}
+.nav-card-icon{font-size:26px;margin-bottom:10px;display:block;line-height:1}
+.nav-card-title{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--navy);margin-bottom:3px}
+.nav-card-sub{font-size:12px;color:var(--ink2);line-height:1.55}
+.nav-card-arrow{position:absolute;bottom:16px;right:16px;font-size:16px;color:var(--border);transition:all .3s}
+.nav-card:hover .nav-card-arrow{color:var(--gold);transform:translateX(4px)}
+
+/* ===== 首页 书封卡（年表入口） ===== */
+
+/* ===== 首页 深色四步区 ===== */
+
+/* ===== 首页 区块 ===== */
+.section{margin-bottom:34px}
+.section-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.section-line{flex:1;height:1px;background:var(--border)}
+.section-title{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--navy);white-space:nowrap;letter-spacing:-.3px}
+.section-count{font-size:12px;color:var(--gold);font-weight:600;background:var(--gold-glow);
+  padding:3px 10px;border-radius:12px;white-space:nowrap}
+.tag-cloud{display:flex;flex-wrap:wrap;gap:10px}
+.ctag{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;background:var(--card);
+  border:1px solid var(--border);border-radius:24px;font-size:14px;color:var(--text);
+  text-decoration:none;transition:all .25s cubic-bezier(.4,0,.2,1);font-weight:500}
+.ctag:hover{border-color:var(--gold);color:var(--navy);box-shadow:0 4px 16px var(--gold-glow);
+  transform:translateY(-2px);text-decoration:none}
+.ctag-n{font-size:11px;font-weight:700;color:#fff;background:var(--gold);padding:2px 8px;
+  border-radius:10px;min-width:20px;text-align:center;font-variant-numeric:tabular-nums}
+.ctag.tier-1{font-size:16px;padding:10px 22px;font-weight:700;border-color:var(--gold-light);
+  background:linear-gradient(135deg,#FFFDF5,#FFF8E7)}
+.ctag.tier-1 .ctag-n{font-size:12px;padding:3px 10px}
+.ctag.tier-2{font-size:15px;padding:9px 20px;font-weight:600}
+.people-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.person-card{display:flex;flex-direction:column;align-items:center;padding:22px 14px 18px;
+  background:var(--card);border:1px solid var(--border);border-radius:14px;text-decoration:none;
+  transition:all .3s;text-align:center;color:var(--text)}
+.person-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.06);
+  border-color:var(--gold-light);text-decoration:none}
+.person-avatar{width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--navy-light));
+  display:flex;align-items:center;justify-content:center;font-size:21px;margin-bottom:11px;
+  color:var(--gold-light);font-family:var(--serif);font-weight:700;box-shadow:0 4px 12px rgba(26,35,50,.15)}
+.person-name{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--navy);margin-bottom:3px}
+.person-refs{font-size:12px;color:var(--ink2)}
+.changelog-hint{text-align:center;font-size:13px;color:var(--ink2);margin-top:28px;padding:15px;
+  border:1px dashed var(--border);border-radius:10px;background:var(--cream);line-height:1.8}
+.changelog-hint a{color:var(--gold);text-decoration:none;font-weight:600}
+.changelog-hint a:hover{text-decoration:underline}
+.audit-line{display:inline-block;margin-top:4px;font-size:12px;color:var(--ink3)}
+.support-section{max-width:900px;margin:14px auto 0;padding:12px 22px;background:transparent;
+  border:1px dashed var(--border);border-radius:10px}
+.support-global{display:flex;align-items:center;gap:16px}
+.support-text{display:flex;align-items:baseline;gap:9px;flex:1;min-width:0;flex-wrap:wrap}
+.support-title{font-family:var(--serif);font-size:13.5px;font-weight:700;color:var(--navy);white-space:nowrap}
+.support-desc{font-size:12px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis}
+.kofi-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:transparent;
+  color:var(--ink2);border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;
+  text-decoration:none;transition:all .25s;white-space:nowrap;flex-shrink:0}
+.kofi-btn:hover{background:var(--cream);color:var(--gold);border-color:var(--gold);text-decoration:none}
+
+/* ===== 通用文字与卡片 ===== */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+.h1{font-family:var(--serif);font-size:30px;font-weight:900;margin:0 0 8px;color:var(--navy);letter-spacing:-.2px;line-height:1.35}
+.h2{font-family:var(--serif);font-size:20px;font-weight:700;margin:34px 0 13px;padding-bottom:8px;
+  border-bottom:2px solid var(--border);color:var(--navy)}
+.lead{color:var(--ink2);font-size:14px;margin:0 0 22px;line-height:1.85;max-width:860px}
+.tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;border:1px solid var(--line2);
+  color:var(--ink2);background:#fff;white-space:nowrap;vertical-align:1px}
+.tag.hit{background:var(--hit-soft);border-color:#c0dd97;color:var(--hit)}
+.tag.miss{background:var(--miss-soft);border-color:#f0b8b8;color:var(--miss)}
+.tag.mix{background:var(--mix-soft);border-color:#efc477;color:var(--mix)}
+.tag.p{background:var(--cream);border-color:#E8D7B4;color:var(--gold)}
+.tag.b{background:var(--accent-soft);border-color:#e3cd9a;color:var(--accent)}
+.tag.s{background:#f3eef8;border-color:#cec2e4;color:#5b3f9e}
+.tag.autotag{background:#eef1f4;border-color:#cdd6de;color:#5f6b76}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:13px;margin-bottom:6px}
+.feat{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;cursor:pointer;transition:.16s;display:block;color:var(--text);text-decoration:none}
+.feat:hover{border-color:var(--gold-light);text-decoration:none;transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.05)}
+.feat h4{margin:0 0 6px;font-family:var(--serif);font-size:15px;font-weight:700;color:var(--navy)}
+.feat p{margin:0;font-size:12.5px;color:var(--ink2);line-height:1.75}
+.feat .k{font-size:11px;color:var(--gold);margin-top:9px;display:block}
+.empty{color:var(--ink3);font-size:13.5px;padding:30px 0;text-align:center}
+.btn{font-size:12.5px;padding:4px 12px;border:1px solid var(--line2);border-radius:6px;background:#fff;
+  color:var(--ink2);cursor:pointer;font-family:inherit;transition:.15s;display:inline-block}
+.btn:hover{border-color:var(--gold);color:var(--gold);text-decoration:none}
+.btn.on{background:var(--accent-soft);border-color:var(--gold);color:var(--gold);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 6px}
+.chip{font-size:12.5px;padding:3px 11px;border:1px solid var(--line2);border-radius:20px;background:#fff;
+  cursor:pointer;color:var(--ink2);text-decoration:none;display:inline-block}
+.chip:hover{border-color:var(--gold);color:var(--navy);text-decoration:none}
+.chip i{font-style:normal;color:var(--ink3);font-size:11px}
+.chip:hover i{color:var(--gold)}
+.more{font-size:12px;color:var(--link);cursor:pointer;background:none;border:none;padding:0;font-family:inherit}
+/* 纯展示的 chip（图例等）不是链接，不能给手型，否则用户会以为点得动 */
+span.chip,span.chip:hover,.chip-k{cursor:default}
+.chip-k:hover{border-color:var(--line2);color:var(--ink2)}
+a.chip{cursor:pointer}
+
+/* ===== 阅读页 ===== */
+.rwrap{display:grid;grid-template-columns:minmax(0,1fr) 246px;gap:30px;align-items:start;min-width:0}
+#body{min-width:0}
+.side{position:sticky;top:24px;background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--radius);padding:15px 16px;font-size:13px;max-height:calc(100vh - 48px);overflow:auto;min-width:0}
+.side h5{margin:0 0 9px;font-size:11px;color:var(--gold);font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
+.side .e{display:flex;justify-content:space-between;gap:8px;padding:3.5px 0;color:var(--ink2);text-decoration:none;font-size:12.5px}
+.side .e:hover{color:var(--gold);text-decoration:none}
+.side .e i{font-style:normal;color:var(--ink3);font-size:11px;font-variant-numeric:tabular-nums}
+.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding-bottom:13px;border-bottom:1px solid var(--border)}
+.ltitle{font-family:var(--serif);font-size:29px;font-weight:900;margin:0 0 4px;color:var(--navy);letter-spacing:-.2px}
+.lmeta{font-size:12px;color:var(--ink3);margin-bottom:18px;letter-spacing:.2px}
+.blk{margin:0 0 15px}
+.blk.h{font-family:var(--serif);font-size:19px;font-weight:700;margin:30px 0 12px;color:var(--navy)}
+.blk.p{text-align:justify;font-size:16px;line-height:2;color:#232019}
+.blk.cur{background:var(--accent-soft);border-radius:6px;padding:6px 9px;margin-left:-9px;margin-right:-9px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0 16px;font-variant-numeric:tabular-nums;background:#fff}
+th,td{border:1px solid var(--border);padding:5px 9px;text-align:right}
+th{background:var(--bg2);text-align:center;font-weight:600;color:var(--navy)}
+td:first-child,th:first-child{text-align:left}
+.ent{border-bottom:1px dashed rgba(139,94,11,.55);cursor:pointer;color:inherit}
+.ent:hover{background:var(--accent-soft);color:var(--link)}
+
+/* ===== 实体页 / 概念页 ===== */
+.epath{font-size:12.5px;color:var(--ink3);margin-bottom:14px;letter-spacing:.2px}
+.lrow{display:flex;align-items:baseline;gap:12px;background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;padding:10px 14px;margin-bottom:7px;transition:.14s;color:var(--text);text-decoration:none}
+.lrow:hover{border-color:var(--gold-light);transform:translateX(2px);text-decoration:none}
+.lrow .ly{font-family:var(--serif);font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums;min-width:42px}
+.lrow .lt{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .lm{font-size:12px;color:var(--ink3);white-space:nowrap}
+.agrtag{font-style:normal;font-size:10.5px;color:var(--gold);border:1px solid #E8D7B4;background:var(--cream);
+  border-radius:4px;padding:1px 6px;margin-left:8px;vertical-align:1px}
+.epath a{color:var(--ink2)}
+.epath a:hover{color:var(--gold)}
+.ename{font-family:var(--serif);font-size:30px;font-weight:900;margin:0;color:var(--navy);letter-spacing:-.2px}
+.een{color:var(--ink3);font-size:13px;margin:3px 0 14px}
+.een a{color:var(--gold)}
+.een a:hover{text-decoration:underline}
+.esum{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--gold);
+  border-radius:8px;padding:14px 17px;font-size:14px;color:var(--ink2);line-height:1.9;margin-bottom:18px}
+.yrblk{margin-bottom:18px}
+.yrhd{display:flex;align-items:baseline;gap:9px;margin-bottom:8px}
+.yrhd b{font-family:var(--serif);font-size:17px;font-weight:700;color:var(--gold)}
+.yrhd span{font-size:11.5px;color:var(--ink3)}
+.snip{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 14px;
+  margin-bottom:6px;font-size:14px;line-height:1.85;color:var(--text);cursor:pointer;transition:.14s}
+.snip:hover{border-color:var(--gold-light);background:#FFFDF8}
+.snip mark{background:#FBEFC6;color:inherit;padding:0 2px;border-radius:2px}
+.snip .go{float:right;font-size:11px;color:var(--ink3);font-family:var(--sans)}
+.snip:hover .go{color:var(--gold)}
+a.snip.qsnip{display:block;text-decoration:none;color:var(--text);padding:11px 15px}
+a.snip.qsnip:hover{text-decoration:none;color:var(--text)}
+/* 出处单独占一行，不要 float：长摘录里浮动的年份标签会压到正文上 */
+.qsnip .go{float:none;display:block;text-align:left;margin-bottom:3px;font-size:11px;color:var(--ink3)}
+.qsnip .go b{color:var(--gold);font-weight:600}
+
+/* ===== 记分牌 ===== */
+.sc{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:17px 19px;margin-bottom:14px}
+.sc h3{margin:0 0 3px;font-family:var(--serif);font-size:18px;font-weight:700;color:var(--navy)}
+.scmeta{font-size:12px;color:var(--ink3);margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.scmeta a{color:var(--gold)}
+.claim{background:var(--accent-soft);border-radius:8px;padding:12px 15px;margin-bottom:12px;
+  font-size:14px;line-height:1.85;border:1px solid #F2E6CC}
+.claim .lb{font-size:11px;color:var(--gold);font-weight:700;display:block;margin-bottom:3px;
+  font-family:var(--sans);letter-spacing:.6px}
+.claim .cf{font-size:12px;color:var(--ink2);margin-top:8px;padding-top:8px;border-top:1px dashed #E8D7B4;font-family:var(--sans)}
+.tl{border-left:2px solid var(--border);margin:0 0 13px;padding-left:0;list-style:none}
+.tl li{position:relative;padding:0 0 12px 20px;font-size:13.5px;line-height:1.75;color:var(--ink2)}
+.tl li:before{content:"";position:absolute;left:-5px;top:8px;width:8px;height:8px;border-radius:50%;
+  background:var(--line2);border:2px solid var(--panel)}
+.tl li.claim:before{background:var(--gold)}
+.tl li.act:before{background:#185fa5}
+.tl li.fact:before{background:var(--hit)}
+.tl li b{color:var(--ink);font-weight:600;margin-right:7px;font-variant-numeric:tabular-nums}
+.tl li.fact{color:var(--ink)}
+.out{background:var(--bg2);border-radius:8px;padding:12px 15px;font-size:13.5px;line-height:1.85}
+.out .lb{font-size:11px;color:var(--ink3);font-weight:700;display:block;margin-bottom:3px;letter-spacing:.6px}
+.src{font-size:11.5px;color:var(--ink3);margin-top:10px}
+.src-link{font-size:11.5px;color:var(--ink3);margin-left:8px;white-space:nowrap;font-weight:400}
+.src-link:hover{text-decoration:underline;color:var(--gold)}
+
+/* ===== 公司页 ===== */
+.cogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.co{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;
+  cursor:pointer;transition:.16s;display:block;color:var(--text);text-decoration:none}
+.co:hover{border-color:var(--gold-light);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.05);text-decoration:none}
+.co h4{margin:0 0 4px;font-family:var(--serif);font-size:15.5px;font-weight:700;color:var(--navy)}
+.co .cmeta{font-size:11.5px;color:var(--ink3);margin-bottom:8px}
+.co .cpeek{font-size:12px;color:var(--ink2);line-height:1.7}
+.co .cpeek div{padding:1px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.co .cpeek b{color:var(--gold);font-weight:600;margin-right:5px;font-variant-numeric:tabular-nums}
+.axis{display:flex;flex-wrap:wrap;gap:3px;margin:10px 0 20px;padding:12px 0;
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.ax{width:17px;height:26px;border-radius:3px;background:#F4EFE7;position:relative;cursor:default;font-size:0}
+/* 只有真的有记录的年份才是可点的，其余刻度是背景刻度线 */
+.ax.on{background:var(--gold);opacity:.85;cursor:pointer}
+.ax.on:hover{outline:2px solid var(--gold-light);outline-offset:1px}
+.ax.off:hover{outline:none}
+.trow{display:grid;grid-template-columns:84px 1fr;gap:14px;padding:10px 0;border-bottom:1px solid #F1EADF;
+  font-size:13.5px;line-height:1.85}
+.trow .ty{font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;font-family:var(--serif)}
+.trow .tn{color:var(--ink2)}
+.trow .tn b{color:var(--ink);font-weight:600}
+.trow.tblrow .tn{color:var(--ink2);font-size:12.5px}
+.trow.tblrow .ty{color:var(--ink3)}
+[data-jump]{cursor:pointer;transition:background .12s}
+[data-jump]:hover{background:#FFFCF5}
+.ci[data-jump]:hover{background:#FFFCF5;border-left-color:var(--gold)}
+.trow[data-jump]:hover{background:#FFFCF5}
+.quote[data-jump]:hover{background:#FFFCF5}
+.period[data-jump]:hover{background:#FFFCF5;border-color:var(--gold-light)}
+.rule[data-jump]:hover{background:#FFFCF5;border-color:var(--gold-light)}
+span.chip{cursor:default}
+.enttag{color:var(--ink3)}
+
+/* ===== 术语演化 ===== */
+.pline{display:flex;gap:0;margin:0 0 22px;overflow-x:auto;padding-bottom:8px}
+.pd{flex:1 1 0;min-width:126px;position:relative;padding:0 9px 0 0}
+.pd .bar{height:5px;background:#EFE8DD;border-radius:3px;position:relative;overflow:hidden}
+.pd .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--gold);border-radius:3px}
+.pd .pn{font-family:var(--serif);font-size:13.5px;font-weight:700;margin:9px 0 2px;color:var(--navy)}
+.pd .py{font-size:11px;color:var(--gold);margin-bottom:5px;font-variant-numeric:tabular-nums;display:inline-block}
+/* 收录范围外的年份（如 1949、1954）：保持同样样式但不可点，避免点了进死路 */
+.noyr{cursor:default;opacity:.7}
+a.noyr{text-decoration:none;pointer-events:none}
+.pd .py:hover{text-decoration:underline}
+.pd .pt{font-size:12.5px;color:var(--ink2);line-height:1.75}
+.period{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px}
+.period .ph{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.period .ph b{font-family:var(--serif);font-size:16px;font-weight:700;color:var(--navy)}
+.period .ph span{font-size:12px;color:var(--gold);font-variant-numeric:tabular-nums}
+.period .ph a{font-size:12px;color:var(--gold)}
+.period .pb{font-size:14px;line-height:1.95;color:var(--ink2);text-align:justify}
+.quote{border-left:3px solid var(--gold-light);padding:4px 0 4px 16px;margin:0 0 16px;position:relative;border-radius:0 6px 6px 0}
+.quote .qt{font-size:15px;line-height:1.95;font-family:var(--serif);color:#2A2620}
+.quote .qy{font-size:11.5px;color:var(--ink3);margin-top:5px}
+.pit{background:#FFFCF5;border:1px solid #F0E2C8;border-radius:8px;padding:12px 16px;
+  font-size:13px;line-height:1.85;color:var(--ink2);margin-bottom:8px}
+
+/* ===== 认错档案 ===== */
+.ct{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 19px;margin-bottom:13px}
+.ct h3{margin:0 0 11px;font-family:var(--serif);font-size:17px;font-weight:700;color:var(--navy)}
+.ci{padding:9px 0 9px 14px;border-left:2px solid var(--border);margin-bottom:7px;font-size:13.5px;
+  line-height:1.85;color:var(--ink2);border-radius:0 4px 4px 0}
+.ci.admit{border-left-color:#185fa5}
+.ci.error{border-left-color:var(--miss)}
+.ci.lesson{border-left-color:var(--gold)}
+.ci.reverse{border-left-color:#5b3f9e}
+.ci b{color:var(--ink);font-weight:700;margin-right:7px;font-variant-numeric:tabular-nums}
+
+/* ===== 规则库 / 搜索框 ===== */
+.sbox{display:flex;gap:9px;margin:0 0 18px;flex-wrap:wrap;align-items:center}
+.sbox input{flex:1 1 240px;font-size:14px;padding:8px 14px;border:1px solid var(--line2);
+  border-radius:8px;background:#fff;color:var(--ink);font-family:inherit}
+.sbox input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow)}
+.rule{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px 17px;margin-bottom:10px;transition:.14s}
+.rule .rt{font-size:14.5px;line-height:1.95;color:#2A2620}
+.rule .rm{font-size:11.5px;color:var(--ink3);margin-top:6px;display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.rule mark{background:#FBEFC6;color:inherit;padding:0 2px;border-radius:2px}
+
+/* ===== 决策卡 ===== */
+.dc{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:14px}
+.dc h3{margin:0 0 4px;font-family:var(--serif);font-size:18px;font-weight:700;color:var(--navy)}
+.scene{background:var(--bg2);border-radius:8px;padding:13px 16px;font-size:14px;line-height:1.9;
+  margin-bottom:13px;color:var(--ink2)}
+.facts{list-style:none;padding:0;margin:0 0 14px}
+.facts li{padding:5px 0 5px 18px;position:relative;font-size:13.5px;color:var(--ink2);line-height:1.75}
+.facts li:before{content:"";position:absolute;left:3px;top:14px;width:5px;height:5px;border-radius:50%;background:var(--line2)}
+.opts{display:grid;gap:7px;margin-bottom:6px}
+.opt{text-align:left;border:1px solid var(--line2);background:#fff;border-radius:8px;padding:11px 15px;
+  cursor:pointer;font-family:inherit;font-size:13.5px;color:var(--ink);line-height:1.65;transition:.14s}
+.opt:hover{border-color:var(--gold);background:var(--accent-soft)}
+.opt.pick{border-color:var(--gold);background:var(--accent-soft);font-weight:600}
+/* 已揭晓的选项是禁用态，不能再给手型和 hover，否则像还能再点一次 */
+.opt[disabled]{cursor:default;opacity:.72}
+.opt[disabled]:hover{border-color:var(--line2);background:#fff}
+.opt.pick[disabled]{opacity:1}
+.opt.pick[disabled]:hover{border-color:var(--gold);background:var(--accent-soft)}
+.opt .n{font-weight:700;margin-right:6px;color:var(--gold)}
+.reveal{margin-top:14px;border-top:1px dashed var(--line2);padding-top:14px}
+.reveal .row{margin-bottom:9px;font-size:13.5px;line-height:1.85}
+.reveal .lb{font-size:11px;font-weight:700;color:var(--ink3);display:block;margin-bottom:3px;letter-spacing:.6px}
+.reveal .actual{background:var(--accent-soft);border-radius:8px;padding:11px 14px;border:1px solid #F2E6CC}
+.reveal .result{background:var(--bg2);border-radius:8px;padding:11px 14px}
+.you{font-size:12.5px;color:var(--ink2);margin-bottom:10px}
+.you b{color:var(--gold)}
+
+/* ===== 入门导引 ===== */
+.paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:6px}
+.pcard{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--gold);
+  border-radius:var(--radius);padding:16px 18px;cursor:pointer;transition:.16s}
+.pcard:hover{border-color:var(--gold-light);border-left-color:var(--gold);transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(0,0,0,.05)}
+.pcard h4{margin:0 0 5px;font-family:var(--serif);font-size:15.5px;font-weight:700;color:var(--navy)}
+.pcard p{margin:0 0 10px;font-size:12.5px;color:var(--ink2);line-height:1.75}
+.pcard .pys{display:flex;gap:5px;flex-wrap:wrap}
+.pcard .py2{font-size:11.5px;padding:2px 9px;border:1px solid var(--border);border-radius:5px;
+  color:var(--gold);font-variant-numeric:tabular-nums;background:var(--cream)}
+
+/* ===== 年表网格 ===== */
+.yrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:7px}
+.yr{background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:9px 4px;
+  text-align:center;cursor:pointer;font-size:13px;transition:.14s}
+.yr:hover{border-color:var(--gold);background:var(--accent-soft);transform:translateY(-1px)}
+.yr b{display:block;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;color:var(--navy)}
+.yr span{font-size:10px;color:var(--ink3)}
+.yr .dot{display:inline-block;width:5px;height:5px;border-radius:50%;margin:3px 1px 0}
+.dot.p{background:#5b3f9e}.dot.b{background:var(--gold)}.dot.s{background:#1f7a6a}
+
+/* ===== 巴菲特午餐会：首页入口 ===== */
+.talk-banner{background:linear-gradient(135deg,#1B2231,#141821);border-radius:18px;
+  padding:26px 30px;margin:34px 0 8px;display:flex;align-items:center;justify-content:space-between;
+  gap:26px;color:#F2EADA;box-shadow:0 12px 28px rgba(20,24,32,.16);position:relative;overflow:hidden}
+.talk-banner::after{content:'';position:absolute;right:-70px;top:-90px;width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle,rgba(212,168,67,.16),transparent 70%);pointer-events:none}
+.tb-left{max-width:560px;position:relative;z-index:1}
+.tb-tag{display:inline-block;background:var(--gold-light);color:#20180A;font-size:11px;font-weight:700;
+  letter-spacing:1px;padding:2px 9px;border-radius:5px}
+.tb-title{font-family:var(--serif);font-size:25px;font-weight:700;color:#F6EFDF;margin:9px 0 6px;
+  display:flex;align-items:center;gap:10px;line-height:1.4}
+.tb-ico{display:inline-flex;color:var(--gold-light)}
+.tb-beta{font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:1px;color:#C9C2B2;
+  border:1px solid rgba(255,255,255,.28);border-radius:4px;padding:1px 6px}
+.tb-desc{font-size:13.5px;line-height:1.85;color:#B9B3A6;margin-bottom:16px}
+.tb-btn{display:inline-block;background:var(--gold);color:#fff;font-size:14px;font-weight:600;
+  padding:10px 22px;border-radius:8px;transition:background .15s,transform .15s}
+.tb-btn:hover{background:var(--gold-light);color:#20180A;transform:translateY(-1px)}
+.tb-qs{display:flex;flex-direction:column;gap:10px;position:relative;z-index:1;flex-shrink:0}
+.tb-q{border:1px solid rgba(255,255,255,.22);background:transparent;color:#D8D2C4;font-size:13px;
+  font-family:var(--sans);padding:8px 16px;border-radius:999px;cursor:pointer;text-align:left;
+  transition:border-color .15s,color .15s,background .15s;white-space:nowrap}
+.tb-q:hover{border-color:var(--gold-light);color:#F6EFDF;background:rgba(212,168,67,.08)}
+
+/* ===== 巴菲特午餐会：对话页 ===== */
+.talk-page{max-width:860px;margin:0 auto;display:flex;flex-direction:column;min-height:calc(100vh - 200px)}
+#talk-body{flex:1 0 auto}
+.tp-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  border-bottom:1px solid var(--border);padding-bottom:14px}
+.tp-brand{font-family:var(--serif);font-size:23px;font-weight:700;color:var(--navy);
+  display:flex;align-items:center;gap:9px;line-height:1.4}
+.tp-brand svg{color:var(--gold)}
+.tp-back{font-size:12.5px;color:var(--ink3);white-space:nowrap}
+.tp-back:hover{color:var(--gold)}
+.tp-sub{font-size:12.5px;color:var(--ink3);margin:9px 0 24px}
+.tp-hero{text-align:center;padding:30px 0 14px}
+.tp-cup{font-size:44px;line-height:1;filter:grayscale(.1)}
+.tp-cup svg{color:var(--gold);opacity:.9}
+.tp-hero p{color:var(--ink3);font-size:13px;margin:14px 0 18px}
+.tp-topics{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:560px;margin:0 auto;text-align:left}
+.tp-topic{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
+  cursor:pointer;font-family:var(--sans);text-align:left;transition:border-color .15s,box-shadow .15s,transform .15s}
+.tp-topic:hover{border-color:var(--gold-light);box-shadow:0 4px 14px rgba(184,134,11,.10);transform:translateY(-1px)}
+.tp-topic b{display:block;font-size:11px;font-weight:600;color:var(--gold);letter-spacing:.6px;margin-bottom:3px}
+.tp-topic span{font-size:14px;color:var(--text)}
+/* scroll-margin-bottom 要盖住粘在底部那一整条（输入框 + 开关），
+   否则"滚到最后一条"会被它压住一截。 */
+.msg{display:flex;gap:10px;margin:0 0 20px;align-items:flex-start;scroll-margin-bottom:150px}
+.msg.u{justify-content:flex-end}
+.msg .bubble{max-width:80%;padding:12px 16px;border-radius:14px;font-size:14.5px;line-height:1.85}
+.msg.u .bubble{background:var(--gold);color:#fff;border-bottom-right-radius:4px;white-space:pre-wrap}
+.msg.b .bubble{background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg .ava{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.msg .ava svg{color:var(--gold)}
+.msg.b .bubble p{margin:0 0 9px}
+.msg.b .bubble p:last-child{margin-bottom:0}
+.tq{border-left:3px solid var(--gold-light);background:var(--cream);padding:9px 13px;border-radius:0 8px 8px 0;
+  font-size:13.5px;line-height:1.85;color:#3A342B;margin:9px 0}
+.tq .src{display:block;margin-top:5px;font-size:11.5px;color:var(--ink3)}
+.tq .src a{color:var(--gold);font-weight:600}
+.ttyping{color:var(--ink3);font-size:13px}
+.talk-sum{background:var(--bg2);border-radius:8px;padding:10px 13px;font-size:12.8px;line-height:1.8;
+  color:var(--ink2);margin:9px 0}
+.talk-follow{color:var(--ink3);font-size:13px}
+.tp-bar{position:sticky;bottom:0;background:var(--bg);z-index:5;padding-top:22px;margin-top:26px}
+.tp-composer{display:flex;gap:9px;align-items:center;padding:14px 0 10px;
+  border-top:1px solid var(--border)}
+.tp-composer input{flex:1;min-width:0;border:1px solid var(--line2);border-radius:10px;padding:12px 14px;
+  font-size:14.5px;font-family:var(--sans);background:var(--panel);color:var(--text);outline:none}
+.tp-composer input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow)}
+.tp-send{background:var(--gold);color:#fff;border:0;border-radius:10px;padding:12px 22px;font-size:14px;
+  font-weight:600;cursor:pointer;font-family:var(--sans);white-space:nowrap}
+.tp-send:hover{background:var(--gold-light);color:#20180A}
+.tp-new{background:transparent;border:1px solid var(--border);color:var(--ink2);border-radius:10px;
+  padding:10px 12px;font-size:12px;cursor:pointer;font-family:var(--sans);white-space:nowrap}
+.tp-new:hover{border-color:var(--gold);color:var(--gold)}
+/* agent 的回答：他自己做了哪几步要摊开给读者看，读者才知道答案不是凭空来的 */
+.tp-steps{margin:0 0 12px;padding:0 0 10px;border-bottom:1px dashed var(--line2)}
+.tp-steps div{font-size:12.3px;color:var(--ink3);line-height:1.9}
+.tp-steps div b{color:var(--gold);font-weight:600}
+.tp-steps.live div:last-child{animation:tpblink 1.1s ease-in-out infinite}
+@keyframes tpblink{0%,100%{opacity:.45}50%{opacity:1}}
+.tp-caret{display:inline-block;width:7px;height:15px;background:var(--gold);vertical-align:-2px;
+  animation:tpblink .9s steps(2,start) infinite;margin-left:2px}
+.msg.b .bubble blockquote{margin:9px 0;padding:9px 14px;background:var(--cream);
+  border-left:3px solid var(--gold-light);border-radius:0 8px 8px 0;font-size:13.6px;line-height:1.85;color:#3A342B}
+.msg.b .bubble blockquote p{margin:0}
+.ct-cite{display:inline-block;font-size:11.5px;color:var(--gold);background:var(--accent-soft);
+  border:1px solid var(--border);border-radius:20px;padding:1px 9px;margin:0 2px;white-space:nowrap;
+  text-decoration:none;font-weight:600;line-height:1.6}
+.ct-cite:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
+.ct-cite.ct-web{background:#EEF4FB;border-color:#CFE0F5;color:#2B5E9E}
+.ct-cite.ct-web:hover{background:#2B5E9E;color:#fff}
+.tp-meta{margin-top:7px;font-size:11px;color:var(--ink3)}
+.tp-h{font-weight:700;color:var(--text);margin-top:12px}
+.tp-srcs{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11.8px;color:var(--ink3)}
+.tp-srcs b{display:block;color:var(--ink2);font-weight:600;margin-bottom:4px;font-size:11.5px}
+.tp-srcs a{display:block;color:var(--gold);text-decoration:none;line-height:1.8;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.tp-srcs a:hover{text-decoration:underline}
+.tp-state{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+  padding:3px 10px;border-radius:20px;margin-left:10px;vertical-align:middle}
+.tp-state.on{background:#EAF6EE;color:#2E7D4F;border:1px solid #CFE8D9}
+.tp-state.off{background:#FDF3E3;color:#8A5A1A;border:1px solid #F0DCB4}
+.tp-state .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.tp-opts{display:flex;gap:14px;align-items:center;font-size:11.8px;color:var(--ink3);
+  margin:0 0 2px;padding-bottom:8px;flex-wrap:wrap;background:var(--bg)}
+.tp-opts label{display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.tp-opts input[type=checkbox]{accent-color:var(--gold);cursor:pointer}
+.tp-stop{background:transparent;border:1px solid var(--line2);color:var(--ink2);border-radius:8px;
+  padding:6px 12px;font-size:12px;cursor:pointer;font-family:var(--sans)}
+.tp-stop:hover{border-color:#C0392B;color:#C0392B}
+.tp-mem{margin-top:6px;font-size:11.5px;color:var(--ink3);text-align:center}
+.tp-mem button{background:none;border:0;color:var(--gold);cursor:pointer;font-size:11.5px;
+  text-decoration:underline;padding:0;font-family:var(--sans)}
+.tp-note{font-size:11.5px;color:var(--ink3);text-align:center;margin:10px 0 0}
+
+/* ===== 响应式 ===== */
+@media(max-width:1180px){
+  .rwrap{grid-template-columns:minmax(0,1fr) 220px;gap:24px}
+  #app.app-page{padding:30px 34px 50px}
+}
+@media(max-width:1240px){
+  #app.app-page,#app.app-read{padding:56px 20px 44px;max-width:none}
+  .sitefoot{padding:18px 20px 26px}
+  .hero-row{gap:16px}
+  .hero-logo{width:58px!important}
+  .hero-eyebrow{font-size:10px;margin-bottom:8px;letter-spacing:1.4px}
+  .hero-title{font-size:24px}
+  .hero-sub{font-size:13.5px;line-height:1.7;margin-top:8px}
+  .hero-sub br{display:block}
+  .stats-row{padding:0 14px;margin-bottom:20px}
+  .stat-item{padding:13px 4px}
+  .stat-num{font-size:24px;letter-spacing:-1px}
+  .stat-label{font-size:10px}
+  .main-inner{padding:0 16px 12px}
+  .nav-cards{grid-template-columns:1fr 1fr;gap:9px;margin-bottom:22px}
+  .nav-cards.nav-cards-5{grid-template-columns:repeat(3,1fr)}
+  .nav-card{padding:14px 12px}
+  .nav-card-icon{font-size:20px;margin-bottom:6px}
+  .nav-card-title{font-size:13px}
+  .nav-card-sub{font-size:11px}
+  .nav-card-arrow{display:none}
+  .section{margin:0 16px 26px}
+  .section-title{font-size:18px}
+  .section-header{gap:8px}
+  .section-count{font-size:11px;padding:2px 8px;white-space:normal}
+  .ctag{font-size:13px;padding:7px 14px}
+  .ctag.tier-1{font-size:14px;padding:8px 16px}
+  .ctag.tier-2{font-size:13.5px;padding:7px 15px}
+  .people-grid{grid-template-columns:repeat(2,1fr)}
+  .person-card{padding:16px 10px 14px}
+  .rwrap{grid-template-columns:1fr}
+  .side{position:static;max-height:none;order:2}
+  .lintro,.h1,.lead{max-width:100%}
+  .h1{font-size:24px}
+  .ltitle{font-size:23px}
+  .ename{font-size:24px}
+  .blk.p{font-size:16px;line-height:1.95}
+  .support-global{flex-direction:column;align-items:stretch;gap:9px;text-align:center}
+  .support-text{justify-content:center}
+  .kofi-btn{align-self:center}
+  .trow{grid-template-columns:66px 1fr;gap:10px}
+}
+@media(max-width:820px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:none}
+  .hamburger{display:block}
+  .main{margin-left:0}
+  .main::after{left:0}
+  .hero-section{padding:54px 20px 16px}
+  /* 九列财务表格在窄屏一定宽于正文，让它自己横向滚，别把整页撑出屏幕 */
+  #body table{display:block;overflow-x:auto;max-width:100%}
+}
+
+@media(max-width:520px){
+  .nav-cards.nav-cards-5{grid-template-columns:1fr 1fr}
+  /* 「阅读机制」三张卡在行内写了 repeat(3,1fr)，窄屏挤成 100px 宽、一行四个字，改成竖排 */
+  .section .nav-cards{grid-template-columns:1fr!important}
+  .talk-banner{flex-direction:column;align-items:stretch;padding:22px 20px;gap:16px}
+  .tb-title{font-size:22px}
+  .tb-qs{flex-direction:row;flex-wrap:wrap}
+  .tb-q{white-space:normal}
+  .tp-topics{grid-template-columns:1fr}
+  .tp-composer{flex-wrap:wrap}
+  .tp-composer input{flex:1 1 100%;order:-1}
+  .msg .bubble{max-width:86%}
+  .stat-num{font-size:21px}
+  .stat-label{font-size:9.5px;letter-spacing:0}
+  .hero-title{font-size:22px}
+}
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-inner"><span class="boot-dot"></span>正在载入股东信全文…<small id="boot-note">首次载入约 5 MB</small></div></div>
+<button class="hamburger" id="hamb" aria-label="打开导航">☰</button>
+<div class="scrim" id="scrim"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a href="#/" class="logo"><img src="assets/kb-logo.svg" class="logo-icon" alt="" width="28" height="28">
+      <span>读巴菲特<small>1956 – 2025</small></span></a>
+  </div>
+  <div class="sidebar-nav" id="snav"></div>
+</aside>
+<div class="main">
+  <main id="app" class="app-home"></main>
+  <footer class="sitefoot" id="sitefoot">
+    <b>版权与来源声明</b>　本站股东信中文全文整理自公开仓库
+    <a href="https://github.com/Sphinm/buffett-letters" target="_blank" rel="noopener">github.com/Sphinm/buffett-letters</a>，
+    原始信件著作权归 Warren E. Buffett 及 Berkshire Hathaway Inc. 所有，仓库标注仅供个人学习与研究。
+    本站为非商业性阅读工具，不主张任何内容权利；如权利人提出异议，将立即下架相关内容。<br>
+    数据经确定性脚本切分，未使用生成模型改写；全文 <span id="foot-chars">—</span> 字符已做逐字无损校验。
+  </footer>
+</div>
+
+<script>
+/* 8 秒还没撤掉加载提示，说明三个数据文件没读到（八成是没跟 index.html 放同一目录）。
+   file:// 双击打开本身是可以的，别把话说错。 */
+setTimeout(function(){
+  var n = document.getElementById('boot-note');
+  if (!n) return;
+  n.innerHTML = '载入时间偏长。请确认 <b>data-core.js / data-letters.js / data-content.js</b> '
+    + '和 index.html 在同一个目录里；若文件缺失，页面无法显示正文。';
+}, 8000);
+</script>
+<script src="data-core.js"></script>
+<script src="data-letters.js"></script>
+<script src="data-content.js"></script>
+<script>
+var C = window.CORE, L = window.LETTERS, CT = window.CONTENT;
+/* 语料真实年份范围（第一封是 1956 有限合伙协议，不是 1957） */
+var CY0 = Math.min.apply(null, C.letters.map(function(l){ return l.year; }));
+var CY1 = Math.max.apply(null, C.letters.map(function(l){ return l.year; }));
+var SURFACES = [], EXCLUDE = {};
+/* 全文字数按切块实算（含表格），页脚校验条直接引用，避免文案与数据对不上 */
+var TOTCHARS = 0;
+Object.keys(L).forEach(function(id){
+  L[id].blocks.forEach(function(b){ TOTCHARS += blockText(b).length; });
+});
+/* 页脚和首页校验条引用的数字一律运行时算，避免写死后和数据对不上 */
+/* 审计结论：三个数字来自 linkaudit.js / actaudit.js 对 2026-10-30 这一版内容的
+   实测输出，浏览器里算不出来，只能写常量。改内容后要重跑两个脚本再改这里。
+   AUD_CLICK 是三次真实鼠标点击的合计：抽样链接 959 + 侧栏 243 + 无 href 元素 74。
+   （早先是 962：那三条 #/talk?q= 会落地自动提问，在线时一问几十秒，已改由 talktest 专测。）
+   AUD_ROUTE 比上面的 NROUTE 多 11 条，不是对不上：审计把 1950–2030 全部年份都走了一遍
+   （含 11 个没有收信的年份，落到"这一年没有收录信件"的说明页），NROUTE 只算有信的年份。
+   去重链接条数两种屏宽下都是 1,255 条，但它是抽样清单的产物、不是用户能感知的量，
+   所以只放在注释里，不写进文案。 */
+var AUD_ROUTE = 446, AUD_HIT = 4743, AUD_CLICK = 1276;
+var NROUTE = 0;
+(function(){
+  var cnt = {};
+  for (var k in C.mentions) cnt[k] = C.mentions[k].length + (C.overflow[k]||0);
+  // 超高频实体不做行内高亮(否则满屏都是链接), 但仍可在实体页追踪
+  for (var k in cnt) if (cnt[k] > 800) EXCLUDE[k] = 1;
+  ['companies','concepts','people'].forEach(function(kind){
+    C[kind].forEach(function(e){
+      if (EXCLUDE[e.name]) return;
+      (C.surf[e.name]||[e.name]).forEach(function(f){
+        if (f.length >= 2) SURFACES.push({f:f, name:e.name, kind:kind});
+      });
+    });
+  });
+  SURFACES.sort(function(a,b){ return b.f.length - a.f.length; });
+})();
+
+/* ---------- 实体归属表：任何名字都能算出它真正该去的页面 ---------- */
+var IS_CONCEPT = {}, IS_COMPANY = {}, IS_PERSON = {};
+C.concepts.forEach(function(e){ IS_CONCEPT[e.name] = 1; });
+C.companies.forEach(function(e){ IS_COMPANY[e.name] = 1; });
+C.people.forEach(function(e){ IS_PERSON[e.name] = 1; });
+/* 档案里的叫法和实体库常常对不上（「伯克希尔·哈撒韦」vs「伯克希尔哈撒韦」、
+   「苹果公司」vs「苹果」）。不补这张表，这些标签就会渲染成点不动的假链接。 */
+var ALIAS = {
+  '伯克希尔·哈撒韦': '伯克希尔哈撒韦',
+  '伯克希尔·哈撒韦（纺织业务）': '伯克希尔哈撒韦',
+  '伯克希尔·哈撒韦（保险业务）': '伯克希尔哈撒韦',
+  '伯克希尔哈撒韦再保险集团': '伯克希尔哈撒韦',
+  '伯克希尔纺织厂': '伯克希尔哈撒韦',
+  '苹果公司': '苹果',
+  '国民保险': '国民保险公司',
+  '内布拉斯加家具城': '内布拉斯加家具店',
+  '大都会公司': '大都会通信'
+};
+/* 没有独立实体页、但正文里确实出现过的名字：用更短、更容易命中的词去检索 */
+var SEARCHAS = {
+  '长期资本管理公司（LTCM）': '长期资本管理公司',
+  '长期资本管理公司': '长期资本管理公司',
+  'Waumbec纺织厂': 'Waumbec',
+  '安然公司': '安然',
+  '登普斯特农具机械': '登普斯特'
+};
+function searchHref(term){ return '#/q/' + encodeURIComponent(term); }
+/* 有独立页面的(概念页/公司页)，否则回落到原文出场页，最后兜底到全文检索。
+   任何名字都返回一个能跳的地址，不留死链。 */
+function entHref(name){
+  if (!name) return null;
+  var n = ALIAS[name] || name;
+  if (CT.concepts[n]) return '#/c/' + encodeURIComponent(n);
+  if (CT.companies[n]) return '#/co/' + encodeURIComponent(n);
+  if (IS_CONCEPT[n]) return '#/e/concepts/' + encodeURIComponent(n);
+  if (IS_COMPANY[n]) return '#/e/companies/' + encodeURIComponent(n);
+  if (IS_PERSON[n]) return '#/e/people/' + encodeURIComponent(n);
+  return searchHref(SEARCHAS[name] || name);
+}
+/* 有信件的年份数：年表里每一格都对应一个 #/y/<年> 地址，必须算进路由总数 */
+var NYEAR = (function(){ var s = {}; C.letters.forEach(function(l){ s[l.year] = 1; }); return Object.keys(s).length; })();
+/* 这两个数依赖 entHref，必须等实体归属表建好之后再算。
+   概念和公司各算两遍是有原因的：一个概念既有「跨年档案」#/c/X，又有「原文出场」#/e/concepts/X，
+   公司同理（#/co/X 与 #/e/companies/X），两个地址都得算进总数，否则和页脚文案对不上。 */
+NROUTE = C.letters.length + C.concepts.length + C.companies.length +
+         C.concepts.length + C.companies.length + C.people.length + 9 + NYEAR;
+function entLink(name, cls, label, tail){
+  var h = entHref(name);
+  var t = esc(label || name) + (tail || '');
+  return h ? '<a class="' + cls + '" href="' + h + '">' + t + '</a>'
+           : '<span class="' + cls + '">' + t + '</span>';
+}
+/* 地址栏里可能残留半个 % 转义（%E4 之类），decodeURIComponent 会抛错把整页打空 */
+function dec(s){
+  try { return decodeURIComponent(s); } catch (e) { return String(s); }
+}
+/* 剥掉 hash 里的 ?b=N 之类的定位参数，只留路由 */
+function route(){
+  return (location.hash.slice(1).split('?')[0]) || '/';
+}
+function hashNum(key){
+  var m = location.hash.match(new RegExp('[?&]' + key + '=(\\d+)'));
+  return m ? +m[1] : null;
+}
+
+/* 中英混排里的英文直引号很难看，显示时按成对关系换成中文引号。
+   只在字符串含中文时才换，纯英文段落保持原样。 */
+function zhq(s){
+  if (!/[\u4e00-\u9fff]/.test(s) || s.indexOf('"') === -1) return s;
+  var open = true;
+  return s.replace(/"/g, function(){ var c = open ? '\u201c' : '\u201d'; open = !open; return c; });
+}
+function esc(s){ return zhq(String(s)).replace(/[&<>"]/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function entCount(n){ return C.mentions[n].length + (C.overflow[n]||0); }
+/* 千分位：10835 → 10,835 */
+function fmt(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function go(h){
+  if (location.hash === h){ render(); return; }   // 地址没变不会触发 hashchange，手动重绘并定位
+  location.hash = h;
+}
+/* 同一年可能有两封信（如 1957 有年中/年末），不再弹窗，统一进年份页让人选 */
+function openYear(y){ go('#/y/' + y); }
+/* 哪些年份真的有信。概念分期里会出现 1949、1954 这类"背景起点"年份，
+   它们早于第一封信（1956），点进去没有原文，所以这类年份不给链接。 */
+var YHAS = {};
+C.letters.forEach(function(l){ YHAS[l.year] = (YHAS[l.year] || 0) + 1; });
+function hasYear(y){ return !!YHAS[y]; }
+/* 有信 → 可点链接；没信 → 同样样式但不可点的纯文本 */
+function yearLink(y, label, cls, title){
+  var t = label || y;
+  if (hasYear(y)) return '<a class="' + cls + '" href="#/y/' + y + '"' +
+    (title ? ' title="' + title + '"' : '') + '>' + t + '</a>';
+  return '<span class="' + cls + ' noyr"' + (title ? ' title="' + title + '"' : '') + '>' + t + '</span>';
+}
+function yearPage(y){
+  var ls = C.letters.filter(function(l){ return l.year === y; });
+  var h = '<div class="epath"><a href="#/">年表</a> · ' + y + ' 年</div>' +
+    '<h1 class="h1">' + y + ' 年</h1>';
+  var prev = null, next = null;
+  C.letters.forEach(function(l){ if (l.year < y) prev = Math.max(prev || 0, l.year); });
+  C.letters.forEach(function(l){ if (l.year > y) next = Math.min(next || 9999, l.year); });
+  if (!ls.length){
+    // 收录范围外的年份不该是死路：说明为什么空着，并给出最近的年份和年表出口
+    return h + '<p class="lead">' + y + ' 年不在收录范围内——本站收录 <b>' + CY0 + '–' + CY1 +
+      '</b> 年的信件，这一年没有原文可读。<br>' +
+      '它出现在这里，通常是作为某个概念的背景起点（比如巴菲特读格雷厄姆的年份），不是信件年份。</p>' +
+      '<div class="toolbar">' +
+      (prev ? '<a class="btn" href="#/y/' + prev + '">← ' + prev + ' 年</a>' : '') +
+      (next ? '<a class="btn" href="#/y/' + next + '">' + next + ' 年 →</a>' : '') +
+      '<a class="btn" href="#/">回年表</a></div>';
+  }
+  h += '<p class="lead">' + (ls.length > 1 ? '这一年有 ' + ls.length + ' 封，点开任意一封。' : '点开读原文。') + '</p>';
+  ls.forEach(function(l){
+    var kn = l.kind === 'partnership' ? '合伙人信' : l.kind === 'special' ? '特别信件' : '伯克希尔股东信';
+    h += '<a class="co" href="#/l/' + encodeURIComponent(l.id) + '"><h4>' + esc(l.id) + '</h4>' +
+      '<div class="cmeta">' + kn + ' · ' + l.n + ' 段 · ' + (l.chars/1000).toFixed(1) + ' 千字</div></a>';
+  });
+  // 这一年发生了什么：认错记录 + 公司时间线
+  var cs = (CT.corrections || []).filter(function(c){ return c.y === y; });
+  if (cs.length){
+    h += '<h2 class="h2">这一年他说过的自我修正</h2>';
+    cs.forEach(function(c){
+      h += '<div class="ci ' + c.k + '"' + jumpAttr(c.loc) + '><b>' + y + '</b><span class="tag">' + CORR_LB[c.k] + '</span> ' +
+        (c.ent ? entLink(c.ent, '', '[' + c.ent + ']') + ' ' : '') + esc(c.t) + locLink(c.loc) + '</div>';
+    });
+  }
+  var tls = [];
+  Object.keys(CT.companies || {}).forEach(function(n){
+    (CT.companies[n].timeline || []).forEach(function(t){
+      if (String(year0(t.y)) === String(y)) tls.push({n:n, note:t.note});
+    });
+  });
+  if (tls.length){
+    h += '<h2 class="h2">这一年提到的公司 · ' + tls.length + '</h2><div class="chips">';
+    tls.slice(0, 40).forEach(function(t){
+      h += entLink(t.n, 'chip', t.n, t.note ? ' <i>' + esc(t.note.slice(0, 24)) + '</i>' : '');
+    });
+    h += '</div>';
+  }
+  h += '<div class="toolbar">' +
+    (prev ? '<a class="btn" href="#/y/' + prev + '">← ' + prev + '</a>' : '') +
+    (next ? '<a class="btn" href="#/y/' + next + '">' + next + ' →</a>' : '') +
+    '<a class="btn" href="#/">回年表</a></div>';
+  return h;
+}
+function year0(s){ var m = String(s).match(/\d{4}/); return m ? +m[0] : 0; }
+function blockText(b){
+  if (b.k === 't') return (b.head||[]).concat(b.rows.map(function(r){return r.join(' ');})).join(' ');
+  return b.t;
+}
+function markIn(text, name){
+  var forms = (C.surf[name]||[name]).slice().sort(function(a,b){return b.length-a.length;});
+  var out = esc(text);
+  forms.forEach(function(f){
+    out = out.split(esc(f)).join('' + esc(f) + '');
+  });
+  return out.replace(//g,'<mark>').replace(//g,'</mark>');
+}
+
+/* ---------- 行内实体高亮(逐段拼接避免互相覆盖) ---------- */
+function renderPara(text){
+  var hits = [], i, t;
+  for (i = 0; i < SURFACES.length; i++){
+    var f = SURFACES[i].f, p = 0;
+    while ((p = text.indexOf(f, p)) !== -1){
+      hits.push({s:p, e:p+f.length, n:SURFACES[i].name, k:SURFACES[i].kind});
+      p += 1;
+    }
+  }
+  if (!hits.length) return esc(text);
+  hits.sort(function(a,b){ return (b.e-b.s)-(a.e-a.s) || a.s-b.s; });
+  var taken = new Uint8Array(text.length), chosen = [], ok;
+  for (i = 0; i < hits.length; i++){
+    ok = true;
+    for (t = hits[i].s; t < hits[i].e; t++) if (taken[t]) { ok = false; break; }
+    if (ok){ for (t = hits[i].s; t < hits[i].e; t++) taken[t] = 1; chosen.push(hits[i]); }
+  }
+  chosen.sort(function(a,b){ return a.s-b.s; });
+  var out = '', pos = 0;
+  chosen.forEach(function(h){
+    out += esc(text.slice(pos, h.s));
+    out += '<span class="ent" data-e="' + esc(h.n) + '" data-k="' + h.k + '">' +
+           esc(text.slice(h.s, h.e)) + '</span>';
+    pos = h.e;
+  });
+  return out + esc(text.slice(pos));
+}
+
+/* ---------- 首页 ---------- */
+function statItem(href, num, label){
+  return '<a class="stat-item" href="' + href + '"><div class="stat-num">' + num +
+    '</div><div class="stat-label">' + label + '</div></a>';
+}
+function navCard(href, icon, title, sub){
+  return '<a href="' + href + '" class="nav-card"><span class="nav-card-icon">' + icon + '</span>' +
+    '<div class="nav-card-title">' + title + '</div><div class="nav-card-sub">' + sub + '</div>' +
+    '<span class="nav-card-arrow">→</span></a>';
+}
+function lettersPage(){
+  var nAll = C.letters.length;
+  var h = '<div class="epath"><a href="#/">首页</a> · 全部信件</div>' +
+    '<h1 class="h1">全部信件 · ' + nAll + ' 篇</h1>' +
+    '<p class="lead">' + (nAll - 1) + ' 封信，另附 1 份 1956 年有限合伙协议（是法律文件，不是信）。按年份排列，点任意一篇读原文。</p>';
+  [['partnership', '合伙人信', '巴菲特管理合伙企业期间每年写给合伙人的信'],
+   ['berkshire', '伯克希尔股东信', '1977 年起每年发布的致股东公开信'],
+   ['special', '特别信件', '独立成篇的特别章节与致辞']].forEach(function(g){
+    var ls = C.letters.filter(function(l){ return l.kind === g[0]; });
+    var ys = ls.map(function(l){ return l.year; });
+    h += '<div class="section"><div class="section-header"><h2 class="section-title">' + g[1] + '</h2>' +
+      '<div class="section-line"></div><span class="section-count">' + ls.length + ' 篇 · ' +
+      Math.min.apply(null, ys) + '–' + Math.max.apply(null, ys) + '</span></div>';
+    ls.forEach(function(l){
+      var isAgr = l.id.indexOf('协议') !== -1;
+      h += '<a class="lrow" href="#/l/' + encodeURIComponent(l.id) + '">' +
+        '<span class="ly">' + l.year + '</span>' +
+        '<span class="lt">' + esc(l.title || l.id) + (isAgr ? '<i class="agrtag">非信件</i>' : '') + '</span>' +
+        '<span class="lm">' + l.n + ' 段 · ' + (l.chars / 1000).toFixed(1) + ' 千字</span></a>';
+    });
+    h += '</div>';
+  });
+  return h;
+}
+function home(){
+  var m = C.meta;
+  var yrs = C.letters.map(function(l){ return l.year; });
+  var y0 = Math.min.apply(null, yrs), y1 = Math.max.apply(null, yrs);
+  var nPart = C.letters.filter(function(l){ return l.kind === 'partnership'; }).length;
+  var nBerk = C.letters.filter(function(l){ return l.kind === 'berkshire'; }).length;
+  var nSpec = C.letters.filter(function(l){ return l.kind === 'special'; }).length;
+  var nBlocks = C.letters.reduce(function(a, l){ return a + l.n; }, 0);
+  var nCorr = (CT.corrections || []).length;
+  var nRule = (CT.rules || []).length;
+  var nCo = Object.keys(CT.companies || {}).length;          // 有人工档案的公司
+  var nCoAll = C.companies.length;                            // 全部可追踪的公司（含自动补录）
+  var nTl = Object.keys(CT.companies || {}).reduce(function(a, k){ return a + (CT.companies[k].timeline||[]).length; }, 0);
+
+  var h = '<section class="hero-section"><div class="hero-row">' +
+    '<img src="assets/kb-logo.svg" class="hero-logo" alt="">' +
+    '<div class="hero-text">' +
+      '<div class="hero-eyebrow">Warren Buffett · Shareholder Letters</div>' +
+      '<div class="hero-title"><h1>读巴菲特<span class="gold">股东信知识库</span></h1>' +
+      '<span class="hero-version">V 1.0</span></div>' +
+    '</div></div>' +
+    '<p class="hero-sub">1957 – ' + y1 + ' 年巴菲特的合伙人信和致股东信，中文全文 <b>' + (m.letters - 1) + '</b> 封 + 1956 年合伙协议 1 份；<br>' +
+    '<b>' + m.concepts + '</b> 个投资概念、<b>' + m.companies + '</b> 家公司、<b>' + m.people + '</b> 位人物，都能一键追到原信</p>' +
+    '</section>';
+
+  h += '<div class="stats-row">' +
+    statItem('#/letters', m.letters, '篇全文') +
+    statItem('#/concept', m.concepts, '个投资概念') +
+    statItem('#/score', m.companies, '家公司') +
+    statItem('#/ents', m.people, '位人物') +
+    '</div>';
+
+  h += '<div class="main-inner">';
+
+  h += '<div class="nav-cards nav-cards-5">' +
+    navCard('#/letters', '📬', '致股东的信总览', m.letters + ' 篇 · 按年份排列') +
+    navCard('#/concept', '💡', '核心思想索引', m.concepts + ' 个投资概念解析') +
+    navCard('#/score', '🏢', '公司记分牌', nCoAll + ' 家 · ' + nCo + ' 份人工档案') +
+    navCard('#/ents', '👤', '实体索引', m.people + ' 位人物 · 全部实体') +
+    navCard('#/rules', '📜', '决策规则库', nRule + ' 条原话可检索') +
+    '</div>';
+
+    var paths = CT.paths || [];
+  if (paths.length){
+    h += '<div class="section"><div class="section-header"><h2 class="section-title">不知道从哪读起？先挑一条路</h2>' +
+      '<div class="section-line"></div><span class="section-count">' + paths.length + ' 条</span></div><div class="paths">';
+    paths.forEach(function(p){
+      h += '<div class="pcard" data-p="' + esc(p.id) + '"><h4>' + esc(p.title) + '</h4>' +
+        '<p>' + esc(p.desc) + '</p><div class="pys">' +
+        p.years.map(function(y){ return '<span class="py2">' + y + '</span>'; }).join('') +
+        '</div></div>';
+    });
+    h += '</div></div>';
+  }
+
+
+
+
+  /* 午餐会：知识库的对话入口。三条示例问题直接带 ?q= 落到对话页并自动发问 */
+  var TQ = ['你怎么看科技股？', '什么是安全边际？', '你怎么看通货膨胀？'];
+  h += '<div class="talk-banner">' +
+    '<div class="tb-left">' +
+      '<span class="tb-tag">AI 问答</span>' +
+      '<div class="tb-title"><span class="tb-ico">' + cupSVG(24) + '</span>巴菲特午餐会 <span class="tb-beta">BETA</span></div>' +
+      '<p class="tb-desc">有投资的困惑？拉把椅子，向奥马哈的老先生请教。<br>' +
+        '他会自己翻完 98 封信，必要时联网核实 —— 每句话标出来处，查不到就说明查不到。</p>' +
+      '<a class="tb-btn" href="#/talk">开始对话 →</a>' +
+    '</div>' +
+    '<div class="tb-qs">' +
+      TQ.map(function(q){
+        return '<a class="tb-q" href="#/talk?q=' + encodeURIComponent(q) + '">' + esc(q) + '</a>';
+      }).join('') +
+    '</div></div>';
+
+  var topC = C.concepts.slice().sort(function(a, b){ return entCount(b.name) - entCount(a.name); }).slice(0, 15);
+  h += '<div class="section"><div class="section-header"><h2 class="section-title">核心投资概念</h2>' +
+    '<div class="section-line"></div><span class="section-count">TOP 15</span></div><div class="tag-cloud">';
+  topC.forEach(function(e, i){
+    h += '<a class="ctag' + (i < 3 ? ' tier-1' : i < 6 ? ' tier-2' : '') + '" href="' +
+      (entHref(e.name) || '#/concept') + '">' + esc(e.name) +
+      '<span class="ctag-n">' + entCount(e.name) + '</span></a>';
+  });
+  h += '</div></div>';
+
+  var topCo = C.companies.slice().sort(function(a, b){ return entCount(b.name) - entCount(a.name); }).slice(0, 15);
+  h += '<div class="section"><div class="section-header"><h2 class="section-title">重要公司</h2>' +
+    '<div class="section-line"></div><span class="section-count">TOP 15</span></div><div class="tag-cloud">';
+  topCo.forEach(function(e, i){
+    h += '<a class="ctag' + (i < 3 ? ' tier-1' : i < 6 ? ' tier-2' : '') + '" href="' +
+      (entHref(e.name) || '#/score') + '">' + esc(e.name) +
+      '<span class="ctag-n">' + entCount(e.name) + '</span></a>';
+  });
+  h += '</div></div>';
+
+  var ppl = C.people.slice().sort(function(a, b){ return entCount(b.name) - entCount(a.name); });
+  h += '<div class="section"><div class="section-header"><h2 class="section-title">关键人物</h2>' +
+    '<div class="section-line"></div><span class="section-count">' + m.people + ' 位</span></div><div class="people-grid">';
+  ppl.forEach(function(e){
+    h += '<a class="person-card" href="' + (entHref(e.name) || '#/ents') + '">' +
+      '<div class="person-avatar">' + esc(e.name.charAt(0)) + '</div>' +
+      '<div class="person-name">' + esc(e.name) + '</div>' +
+      '<div class="person-refs">被引用 ' + entCount(e.name) + ' 次</div></a>';
+  });
+  h += '</div></div>';
+
+
+  h += '<div class="section"><div class="section-header"><h2 class="section-title">阅读机制</h2>' +
+    '<div class="section-line"></div><span class="section-count">原文不动 · 机制让它好读</span></div>' +
+    '<div class="nav-cards" style="grid-template-columns:repeat(3,1fr);margin-bottom:0">' +
+    navCard('#/corr', '🪞', '认错账本', nCorr + ' 条他亲口说出的错，每条点回原文') +
+    navCard('#/ents', '🧭', '实体跨年追踪', '点正文里的名字，看它 ' + (y1 - y0 + 1) + ' 年里的每一次出场') +
+    navCard('#/decide', '🎲', '决策卡', '先下注，再看他怎么做的、结果如何 · ' + C.decisions.length + ' 张') +
+    '</div></div>';
+
+  var byYear = {};
+  C.letters.forEach(function(l){ (byYear[l.year] = byYear[l.year] || []).push(l); });
+  h += '<div class="section"><div class="section-header"><h2 class="section-title">年表</h2>' +
+    '<div class="section-line"></div><span class="section-count">紫点合伙人信 · 金点股东信 · 绿点特别信件</span></div><div class="yrgrid">';
+  for (var y = y0; y <= y1; y++){
+    var ls = byYear[y] || [];
+    var dots = ls.map(function(l){ return '<i class="dot ' + l.kind.charAt(0) + '"></i>'; }).join(' ');
+    h += '<div class="yr" data-y="' + y + '"><b>' + y + '</b><span>' + (ls.length ? dots : '—') + '</span></div>';
+  }
+  h += '</div></div>';
+
+  h += '<div class="support-section"><div class="support-global">' +
+    '<div class="support-text"><span class="support-title">版权与来源</span>' +
+    '<span class="support-desc">全文整理自公开仓库，著作权归原作者；非商业阅读工具，权利人异议即下架</span></div>' +
+    '<a href="https://github.com/Sphinm/buffett-letters" target="_blank" rel="noopener" class="kofi-btn">查看来源仓库 ↗</a>' +
+    '</div></div>';
+
+  /* 校验条分两段：上一段是页面运行时实算的语料规模，下一段是审计脚本在
+     2026-10-30 这一版内容上的实测记录（访客看不到脚本，无从复算，所以标明日期）。
+     内容一改，AUD_* 三个数就要重跑 linkaudit.js / actaudit.js 再更新。 */
+  h += '<p class="changelog-hint">全文 ' + fmt(TOTCHARS) + ' 字逐字无损校验 · ' +
+    '全站 ' + fmt(NROUTE) + ' 个地址全部可达（' +
+    C.letters.length + ' 封信 + ' + C.concepts.length + ' 个概念 × 2 页 + ' + C.companies.length +
+    ' 家公司 × 2 页 + ' + C.people.length + ' 位人物 + ' + NYEAR + ' 个年份 + 9 个栏目）<br>' +
+    '<span class="audit-line">2026-10-30 全量审计：' + fmt(AUD_ROUTE) + ' 条路由 · ' +
+    fmt(AUD_HIT) + ' 处链接逐条命中测试 · ' +
+    fmt(AUD_CLICK) + ' 次真实鼠标点击，零死链</span></p>';
+
+
+  h += '</div>';
+  return h;
+}
+
+/* ---------- 阅读页 ---------- */
+function letter(id){
+  var L2 = L[id];
+  if (!L2) return notFound('信件', id);
+
+  var hit = {}, order = [];
+  L2.blocks.forEach(function(b){
+    var tx = blockText(b);
+    SURFACES.forEach(function(s){
+      /* 这里必须记 1：以前写的是 0，0 是假值，!hit[name] 永远成立，
+         同一封信里出现几次就 push 几次，「本信出现的实体」于是满屏重复。 */
+      if (tx.indexOf(s.f) !== -1 && !hit[s.name]){ hit[s.name] = 1; order.push({n:s.name, k:s.kind}); }
+    });
+  });
+
+  var h = '<div class="epath"><a href="#/">年表</a> · ' + L2.year + ' · ' +
+    (L2.kind === 'partnership' ? '合伙人信' : L2.kind === 'special' ? '特别信件' : '股东信') + '</div>' +
+    '<h1 class="ltitle">' + esc(id) + '</h1>' +
+    '<div class="lmeta">' + L2.blocks.length + ' 段 · ' +
+    (L2.blocks.reduce(function(a,b){ return a + blockText(b).length; }, 0)) + ' 字</div>';
+
+  var idx = C.letters.findIndex(function(l){ return l.id === id; });
+  h += '<div class="toolbar">' +
+    (idx > 0 ? '<button class="btn" id="t-up">上一年</button>' : '') +
+    (idx >= 0 && idx < C.letters.length - 1 ? '<button class="btn" id="t-dn">下一年</button>' : '') +
+    '<a class="btn" href="#/">回年表</a></div>';
+
+  h += '<div class="rwrap"><div id="body">';
+  L2.blocks.forEach(function(b, bi){
+    if (b.k === 'h'){ h += '<div class="blk h" id="b' + bi + '">' + esc(b.t) + '</div>'; return; }
+    if (b.k === 't'){
+      h += '<table id="b' + bi + '">';
+      if (b.head) h += '<tr>' + b.head.map(function(c){ return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
+      b.rows.forEach(function(r){ h += '<tr>' + r.map(function(c){ return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; });
+      h += '</table>';
+      return;
+    }
+    h += '<div class="blk p" id="b' + bi + '">' + renderPara(b.t) + '</div>';
+  });
+  h += '</div><aside class="side"><h5>本信出现的实体</h5>';
+  if (!order.length) h += '<div style="color:var(--ink3);font-size:12px">无</div>';
+  order.sort(function(a,b){ return entCount(b.n) - entCount(a.n); }).slice(0, 26).forEach(function(e){
+    h += '<a class="e" href="#/e/' + e.k + '/' + encodeURIComponent(e.n) + '"><span>' + esc(e.n) + '</span><i>' + entCount(e.n) + '</i></a>';
+  });
+  h += '</aside></div>';
+  return h;
+}
+
+/* ---------- 实体页 ---------- */
+function entity(kind, name){
+  var e = null;
+  // kind 只可能是这三类；地址里写别的会取不到数组，直接 500
+  if (!C[kind]) return notFound('实体类别', kind + ' / ' + name);
+  C[kind].forEach(function(x){ if (x.name === name) e = x; });
+  if (!e) return notFound(kind === 'concepts' ? '概念' : kind === 'companies' ? '公司' : '人物', name);
+  var ms = C.mentions[name] || [], ov = C.overflow[name] || 0;
+  var byYear = {};
+  ms.forEach(function(m){ (byYear[m[0]] = byYear[m[0]] || []).push(m); });
+  var years = Object.keys(byYear).map(Number).sort(function(a,b){ return a-b; });
+
+  var h = '<div class="epath"><a href="#/">年表</a> · <a href="#/ents">实体</a> · ' +
+    (kind === 'companies' ? '公司' : kind === 'concepts' ? '概念' : '人物') + '</div>' +
+    '<h1 class="ename">' + esc(name) + '</h1>' +
+    '<div class="een">' + (e.en ? esc(e.en) + ' · ' : '') + '在 ' + years.length + ' 个年份、' + (ms.length + ov) + ' 段中出现</div>';
+  if (e.summary) h += '<div class="esum">' + esc(e.summary) + '</div>';
+
+  h += '<h2 class="h2">跨年出场 · 按时间排列</h2>';
+  if (ov) h += '<p style="font-size:12px;color:var(--ink3);margin:-4px 0 14px">另有 ' + ov + ' 次出现未在下方展开（单实体展示上限 400 段）</p>';
+
+  years.forEach(function(y){
+    var arr = byYear[y];
+    h += '<div class="yrblk"><div class="yrhd"><b>' + y + '</b><span>' + arr.length + ' 段</span></div>';
+    arr.slice(0, 6).forEach(function(m){
+      var b = L[m[2]] && L[m[2]].blocks[m[1]];
+      if (!b) return;
+      var tx = blockText(b);
+      if (tx.length > 150) tx = tx.slice(0, 150) + '…';
+      h += '<div class="snip" data-go="' + m[2] + '" data-b="' + m[1] + '">' +
+        '<span class="go">' + m[2].replace(' 巴菲特致股东信','').replace(' 巴菲特致合伙人信','') + ' →</span>' +
+        markIn(tx, name) + '</div>';
+    });
+    h += '</div>';
+  });
+  return h;
+}
+
+/* ---------- 全文检索页（#/q/<词>） ---------- */
+/* 没有独立实体页的名字不再是死链，一律落到这里：先给实体命中，再给原文命中 */
+function searchPage(q){
+  q = (q || '').trim();
+  if (!q) return notFound('检索词', '（空）');
+  var hits = [];
+  [['concepts', '概念', C.concepts], ['companies', '公司', C.companies], ['people', '人物', C.people]].forEach(function(g){
+    g[2].forEach(function(e){
+      if (e.name.indexOf(q) !== -1 || (e.en && e.en.toLowerCase().indexOf(q.toLowerCase()) !== -1)){
+        hits.push({k: g[0], n: e.name, s: e.summary || e.en || ''});
+      }
+    });
+  });
+  var h = '<div class="epath"><a href="#/">首页</a> · 全文检索</div>' +
+    '<h1 class="h1">「' + esc(q) + '」</h1>';
+  if (hits.length){
+    h += '<p class="lead">实体库里命中 ' + hits.length + ' 个，点进去看它的跨年出场。</p><div class="chips">';
+    hits.forEach(function(x){
+      h += '<a class="chip" href="#/e/' + x.k + '/' + encodeURIComponent(x.n) + '">' + esc(x.n) +
+        ' <i>' + (x.s ? esc(x.s.slice(0, 16)) : (x.k === 'concepts' ? '概念' : x.k === 'companies' ? '公司' : '人物')) + '</i></a>';
+    });
+    h += '</div>';
+  }
+  // 原文命中：按信分组的段落摘录，直接落到那一段
+  var paras = [];
+  for (var li = 0; li < C.letters.length && paras.length < 80; li++){
+    var id = C.letters[li].id, lt = L[id];
+    if (!lt) continue;
+    var bs = lt.blocks, got = 0;
+    for (var bi = 0; bi < bs.length && got < 3; bi++){
+      var tx = blockText(bs[bi]);
+      var pp = tx.indexOf(q);
+      if (pp === -1) continue;
+      paras.push({id: id, b: bi,
+        s: (pp > 26 ? '…' : '') + tx.slice(Math.max(0, pp - 26), pp + 70) + '…'});
+      got++;
+    }
+  }
+  if (!paras.length){
+    h += '<p class="lead">实体库和 ' + C.letters.length + ' 封信的正文里都没有「' + esc(q) + '」。' +
+      '换个更短的词试试，比如只留公司名的前两个字。</p>' +
+      '<div class="toolbar"><a class="btn" href="#/ents">去实体总览</a>' +
+      '<a class="btn" href="#/letters">去信件总览</a><a class="btn" href="#/">回首页</a></div>';
+    return h;
+  }
+  h += '<h2 class="h2">原文里出现 ' + (paras.length >= 80 ? '80+' : paras.length) + ' 段</h2>' +
+    '<p class="lead" style="margin:-6px 0 14px">实体库命中 ' + hits.length +
+    ' 个，下面每段都直接跳到那封信的对应位置。</p>';
+  paras.forEach(function(p){
+    h += '<a class="snip qsnip" href="#/l/' + encodeURIComponent(p.id) + '?b=' + p.b + '">' +
+      '<span class="go"><b>' + esc(p.id.replace(' 巴菲特致股东信', '').replace(' 巴菲特致合伙人信', '')) +
+      '</b> · 第 ' + (p.b + 1) + ' 段</span>' +
+      markIn(p.s, q) + '</a>';
+  });
+  h += '<div class="toolbar"><a class="btn" href="#/ents">实体总览</a>' +
+    '<a class="btn" href="#/letters">信件总览</a><a class="btn" href="#/">回首页</a></div>';
+  return h;
+}
+/* ---------- 兜底页：任何不存在的路由都要说清楚，不能静默回首页 ---------- */
+function notFound(kind, name){
+  return '<div class="epath"><a href="#/">首页</a> · 没找到</div>' +
+    '<h1 class="h1">没有这个' + esc(kind) + '</h1>' +
+    '<p class="lead">地址里的「' + esc(name) + '」在站内没有对应内容。' +
+    '可能是链接抄错了，也可能这个名字只有原文出场、没有单独成页。</p>' +
+    '<div class="toolbar">' +
+    (name && name.length > 1 ? '<a class="btn" href="' + searchHref(name) + '">在全文里搜「' + esc(name.slice(0, 10)) + '」</a>' : '') +
+    '<a class="btn" href="#/ents">实体总览</a>' +
+    '<a class="btn" href="#/letters">全部信件</a>' +
+    '<a class="btn" href="#/">回首页</a></div>';
+}
+
+/* ---------- 实体总览 ---------- */
+function ents(){
+  var h = '<h1 class="h1">实体</h1><p class="lead">点任意一个，看它在 ' + (CY1 - CY0 + 1) + ' 年里的每一次出场。' +
+    '标「补录」的是拿信件全文独立扫描后补进来的（源档案库未收录）。</p>';
+  [['companies','公司', C.companies], ['concepts','概念', C.concepts], ['people','人物', C.people]].forEach(function(g){
+    var list = g[2].slice().sort(function(a,b){ return entCount(b.name) - entCount(a.name); });
+    h += '<h2 class="h2">' + g[1] + ' · ' + list.length + '</h2><div class="fgrid">';
+    list.forEach(function(e){
+      h += '<a class="feat" href="#/e/' + g[0] + '/' + encodeURIComponent(e.name) + '">' +
+        '<h4>' + esc(e.name) + (e.auto ? ' <span class="tag autotag" style="font-size:10px;vertical-align:2px">补录</span>' : '') + '</h4>' +
+        '<p>' + (e.summary ? esc(e.summary.slice(0, 58)) + '…' : esc(e.en || '')) + '</p>' +
+        '<span class="k">' + entCount(e.name) + ' 段提及</span></a>';
+    });
+    h += '</div>';
+  });
+  return h;
+}
+
+/* ---------- 记分牌 ---------- */
+function score(){
+  var h = '<h1 class="h1">记分牌</h1><p class="lead">' +
+    '他每年都在信里下判断。这里把三件事并排：当年怎么说的、当时说得多确定、后来事实是什么。<br>' +
+    '命中和错判都列——只列对的那不叫记分牌，叫宣传册。全部条目取自语料并标注出处年份。</p>';
+  // 精选判断: 逐条核对的 6 条 + 人工整理的 15 张, 全部同一卡片样式
+  var allCards = C.scorecard.concat(
+    Object.keys(CT.scorecards || {})
+      .filter(function(k){ return !CT.scorecards[k].auto; })
+      .map(function(k){ return CT.scorecards[k]; }));
+  var hits = allCards.filter(function(s){ return s.verdict === 'hit'; }).length;
+  var miss = allCards.filter(function(s){ return s.verdict === 'miss'; }).length;
+  h += '<p style="margin:-10px 0 20px;font-size:13px;color:var(--ink3)">' +
+    '精选判断 ' + allCards.length + ' 张：命中 ' + hits + ' · 错判 ' + miss + ' · 参半 ' +
+    (allCards.length - hits - miss) + ' —— 点公司名进公司页，每家也有同款判断卡片（其余为自动整理）</p>';
+  allCards.forEach(function(s){
+    h += scCard(s, '') + '';
+  });
+
+  var allNames = Object.keys(CT.companies || {});
+  var totTL = allNames.reduce(function(a,k){ return a + (CT.companies[k].timeline || []).length; }, 0);
+  var totFill = allNames.reduce(function(a,k){ return a + (CT.companies[k].filled || 0); }, 0);
+  var list = coList();
+
+  h += '<h2 class="h2">公司轨迹 · 人工档案 ' + allNames.length + ' 家 · ' + totTL + ' 条时间线</h2>' +
+    '<p class="lead" style="margin-bottom:14px">上面是精选判断卡片。下面是这 ' + allNames.length +
+    ' 家有人工档案的公司的完整年份轨迹——每条都带原文落点（点「原文 ↗」跳到那一年的信）；' +
+    '另有 ' + (C.companies.length - allNames.length) + ' 家是全文扫描补录的，列在页面底部。' +
+    '要点取自实体档案，档案里没写的从当年信件正文回填（已回填 ' + totFill + ' 条），' +
+    '只有持仓表的年份标「持仓表」。点任意公司进它的记分牌页面。</p>';
+
+  h += '<div class="sbox"><input id="cq" placeholder="搜公司名，例如：可口可乐 / 保险 / IBM" value="' + esc(coQ) + '">' +
+    '<button class="btn" id="cc">清空</button>' +
+    '<span style="font-size:12.5px;color:var(--ink3)">' + coList().length + ' / ' + allNames.length + ' 家</span></div>';
+
+  h += '<div class="cogrid">';
+  coList().forEach(function(x){
+    var c = x.c, ys = c.years || [];
+    h += '<a class="co" href="#/co/' + encodeURIComponent(x.n) + '">' +
+      '<h4>' + esc(x.n) + '</h4>' +
+      '<div class="cmeta">' + ys.length + ' 个年份 · ' + (c.timeline || []).length + ' 条' +
+      (ys.length ? ' · ' + ys[0] + '–' + ys[ys.length-1] : '') + '</div><div class="cpeek">';
+    (c.timeline || []).filter(function(t){ return t.note; }).slice(0, 3).forEach(function(t){
+      h += '<div><b>' + esc(t.y) + '</b>' + esc(t.note.slice(0, 40)) + '</div>';
+    });
+    h += '</div></a>';
+  });
+  h += '</div>';
+  if (!coList().length) h += '<div class="empty">没有匹配的公司</div>';
+
+  // 独立核实后补录的公司(源档案库没有收录, 只有原文出场追踪)
+  var autoCos = C.companies.filter(function(e){ return e.auto; });
+  if (autoCos.length){
+    h += '<h2 class="h2">自动补录的公司 · ' + autoCos.length + ' 家</h2>' +
+      '<p class="lead" style="margin-bottom:14px">上面 ' + allNames.length +
+      ' 家来自实体档案库。下面这些在信件里反复出现、但档案库<b>没有收录</b>——' +
+      '是拿信件全文独立扫描后补录的（如沃尔玛 16 个年份、宝洁 12 个年份、优先股 29 个年份）。' +
+      '没有人工档案，但每一段出场都可点回原文。</p><div class="chips">';
+    autoCos.slice().sort(function(a,b){ return entCount(b.name) - entCount(a.name); }).forEach(function(e){
+      h += '<a class="chip" href="#/e/companies/' + encodeURIComponent(e.name) + '">' +
+        esc(e.name) + ' <i>' + entCount(e.name) + ' 段</i></a>';
+    });
+    h += '</div>';
+  }
+  return h;
+}
+var coQ = '';
+function coList(){
+  var names = Object.keys(CT.companies || {});
+  var q = coQ.trim();
+  return names.map(function(n){ return {n:n, c:CT.companies[n]}; })
+    .filter(function(x){ return !q || x.n.indexOf(q) !== -1; })
+    .sort(function(a,b){ return (b.c.years||[]).length - (a.c.years||[]).length; });
+}
+
+/* ---------- 决策卡 ---------- */
+var picks = {};
+function decide(){
+  var h = '<h1 class="h1">决策卡</h1><p class="lead">' +
+    '只给你决策时点能掌握的信息。你先选，再揭晓他怎么做的、后来怎样。<br>' +
+    '关键不在“猜对”，在于你能不能说出自己判断的理由。</p>';
+  C.decisions.forEach(function(d){
+    var p = picks[d.id];
+    h += '<div class="dc"><h3>' + esc(d.title) + '</h3>' +
+      '<div class="scmeta"><span class="tag b">' + d.year + ' 年</span>' +
+      '<a href="#/e/companies/' + encodeURIComponent(d.entity) + '">' + esc(d.entity) + '</a></div>' +
+      '<div class="scene">' + esc(d.scene) + '</div>' +
+      '<ul class="facts">' + d.facts.map(function(f){ return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>';
+    if (p === undefined){
+      h += '<div class="opts">' + d.options.map(function(o, i){
+        return '<button class="opt" data-d="' + d.id + '" data-i="' + i + '"><span class="n">' +
+          (i+1) + '.</span>' + esc(o.label) + '</button>';
+      }).join('') + '</div>';
+    } else {
+      h += '<div class="you">你选的是 <b>' + esc(d.options[p].label) + '</b></div>';
+      h += '<div class="opts">' + d.options.map(function(o, i){
+        return '<button class="opt' + (i === p ? ' pick' : '') + '" disabled><span class="n">' +
+          (i+1) + '.</span>' + esc(o.label) + '</button>';
+      }).join('') + '</div>';
+      h += '<div class="reveal"><div class="row actual"><span class="lb">他实际怎么做的</span>' + esc(d.actual) + '</div>' +
+        '<div class="row result"><span class="lb">后来</span>' + esc(d.result) + '</div></div>';
+    }
+    h += '<div class="src">出处：' + esc(d.src) + '</div></div>';
+  });
+  return h;
+}
+
+/* ================= 第二步：术语演化 ================= */
+function concepts(){
+  var list = C.concepts.slice().sort(function(a,b){
+    var ca = CT.concepts[a.name] || {}, cb = CT.concepts[b.name] || {};
+    return ((cb.periods||[]).length + (cb.quotes||[]).length) -
+           ((ca.periods||[]).length + (ca.quotes||[]).length);
+  });
+  var h = '<h1 class="h1">术语演化</h1><p class="lead">' +
+    '同一个词，他在 ' + (CY1 - CY0 + 1) + ' 年里反复讲，说法会变，有时还会翻面。<br>' +
+    '这里把每个概念按<b>分期</b>摊开：他在哪个阶段怎么说、什么时候改的口、改口的原因是什么。' +
+    '分期和原话全部摘自语料，每条原话标了年份。</p>';
+  h += '<div class="chips" style="margin-bottom:18px">';
+  list.slice(0, 14).forEach(function(e){
+    var auto = !CT.concepts[e.name];
+    var c = CT.concepts[e.name] || {};
+    h += '<a class="chip" href="' + (auto ? '#/e/concepts/' + encodeURIComponent(e.name) : '#/c/' + encodeURIComponent(e.name)) + '">' + esc(e.name) +
+         ' <i>' + ((c.periods||[]).length) + ' 期 / ' + ((c.quotes||[]).length) + ' 句</i></a>';
+  });
+  h += '</div>';
+  h += '<h2 class="h2">全部概念 · ' + list.length + '</h2><div class="cogrid">';
+  list.forEach(function(e){
+    var c = CT.concepts[e.name];
+    var auto = !c;
+    c = c || {};
+    var ps = c.periods || [], qs = c.quotes || [];
+    var span = ps.length ? (ps[0].y0 + '–' + ps[ps.length-1].y1) : '';
+    // 自动补录概念没有人工档案(分期/原话), 直接给原文出场页
+    var href = auto ? '#/e/concepts/' + encodeURIComponent(e.name)
+                    : '#/c/' + encodeURIComponent(e.name);
+    h += '<a class="co" href="' + href + '">' +
+      '<h4>' + esc(e.name) + (auto ? ' <span class="tag autotag" style="font-size:10px;vertical-align:2px">补录</span>' : '') + '</h4>' +
+      '<div class="cmeta">' + (auto
+        ? '自动补录 · ' + entCount(e.name) + ' 段原文出场'
+        : (span ? span + ' · ' : '') + ps.length + ' 个阶段 · ' + qs.length + ' 句原话') + '</div>' +
+      '<div class="cpeek">' + (auto ? '' :
+        ((ps[0] ? '<div><b>' + ps[0].y0 + '</b>' + esc(ps[0].text.slice(0, 44)) + '…</div>' : '') +
+        (ps[1] ? '<div><b>' + ps[1].y0 + '</b>' + esc(ps[1].text.slice(0, 44)) + '…</div>' : ''))) +
+      '</div></a>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function conceptPage(name){
+  var c = CT.concepts[name];
+  /* 补录概念没有人工档案（分期/原话）。以前这里直接返回"没有这个概念"，
+     从收藏夹或外链进来就是一条死路；现在退回它的原文出场页。 */
+  if (!c){
+    if (IS_CONCEPT[name]) return entity('concepts', name);
+    return notFound('概念', name);
+  }
+  var ps = c.periods || [], qs = c.quotes || [];
+  // 时间轴原点取"语料起点"和"最早分期"里更早的那个，否则 1949/1956 那几段会画到轴外
+  var pmin = CY0, pmax = CY1;
+  ps.forEach(function(p){ pmin = Math.min(pmin, p.y0); pmax = Math.max(pmax, p.y1); });
+  var Y0 = pmin, Y1 = pmax, SPAN = Y1 - Y0 + 1;
+
+  var h = '<div class="epath"><a href="#/">年表</a> · <a href="#/concept">术语演化</a> · 概念</div>' +
+    '<h1 class="ename">' + esc(name) + '</h1>' +
+    '<div class="een">' + ps.length + ' 个阶段 · ' + qs.length + ' 句原话 · ' +
+    '<a href="#/e/concepts/' + encodeURIComponent(name) + '">看它在原文里的全部出场</a></div>';
+  if (c.def) h += '<div class="esum">' + esc(c.def) + '</div>';
+
+  if (ps.length){
+    h += '<h2 class="h2">思想演变 · 分期</h2><div class="pline">';
+    ps.forEach(function(p){
+      var w = Math.max(1, (p.y1 - p.y0 + 1)) / SPAN * 100;
+      var x = (p.y0 - Y0) / SPAN * 100;
+      h += '<div class="pd" style="flex-grow:' + Math.max(1, p.y1 - p.y0 + 1) + '">' +
+        '<div class="bar"><i style="left:' + x.toFixed(1) + '%;width:' + w.toFixed(1) + '%"></i></div>' +
+        '<div class="pn">' + esc(p.name) + '</div>' +
+        yearLink(p.y0, p.y0 + ' – ' + p.y1 + (hasYear(p.y0) ? ' ↗' : ''), 'py',
+          hasYear(p.y0) ? ('看 ' + p.y0 + ' 年的信') : (p.y0 + ' 年没有收录信件')) +
+        '<div class="pt">' + esc(p.text.slice(0, 130)) + (p.text.length > 130 ? '…' : '') + '</div></div>';
+    });
+    h += '</div>';
+    ps.forEach(function(p){
+      h += '<div class="period"' + (hasYear(p.y0) ? ' data-jump="#/y/' + p.y0 + '" title="看 ' + p.y0 + ' 年的信"' : '') +
+        '><div class="ph"><b>' + esc(p.name) + '</b>' +
+        yearLink(p.y0, p.y0 + ' – ' + p.y1 + (hasYear(p.y0) ? ' ↗' : ''), '',
+          hasYear(p.y0) ? ('看 ' + p.y0 + ' 年的信') : (p.y0 + ' 年没有收录信件')) + '</div>' +
+        '<div class="pb">' + esc(p.text) + '</div></div>';
+    });
+  }
+
+  if (qs.length){
+    h += '<h2 class="h2">原话精选 · ' + qs.length + ' 句（按年份）</h2>';
+    qs.slice().sort(function(a,b){ return a.y - b.y; }).forEach(function(q){
+      h += '<div class="quote"' + jumpAttr(q.loc) + '><div class="qt">「' + esc(q.t) + '」</div>' +
+        '<div class="qy">—— ' + q.y + ' 年' + (q.kind ? esc(q.kind) : '') + '信' +
+        (q.note ? '（' + esc(q.note) + '）' : '') +
+        locLink(q.loc) + '</div></div>';
+    });
+  }
+
+  if ((c.pitfalls || []).length){
+    h += '<h2 class="h2">常见误区</h2>';
+    c.pitfalls.forEach(function(p){
+      h += '<div class="pit">' + esc(p.replace(/\s+/g, ' ').trim()) + '</div>';
+    });
+  }
+  if ((c.related || []).length){
+    h += '<h2 class="h2">相关概念</h2><div class="chips">';
+    c.related.forEach(function(r){
+      h += entLink(r.name, 'chip', r.name, ' <i>' + esc(r.desc.slice(0, 22)) + '</i>');
+    });
+    h += '</div>';
+  }
+  if ((c.cases || []).length){
+    h += '<h2 class="h2">典型案例公司</h2><div class="chips">';
+    c.cases.forEach(function(r){
+      h += entLink(r.name, 'chip', r.name, ' <i>' + esc(r.desc.slice(0, 22)) + '</i>');
+    });
+    h += '</div>';
+  }
+  return h;
+}
+
+/* ---------- 统一记分牌卡片渲染器（航空业/康菲同款样式，三层来源共用） ---------- */
+function scCard(s, level){
+  var vt = s.verdict === 'hit' ? '命中' : s.verdict === 'miss' ? '错判' :
+           s.verdict === 'mix' ? '参半' : '未评';
+  var vcls = s.verdict ? s.verdict : 'autotag';
+  var h = '<div class="sc"><h3>' + esc(s.title || s.entity) + '</h3>' +
+    '<div class="scmeta"><span class="tag ' + vcls + '">' + vt + '</span>' +
+    (s.status ? '<span class="tag">' + esc(s.status) + '</span>' : '') +
+    (level === 'auto' ? '<span class="tag autotag">自动整理 · 未逐条核对</span>' : '') +
+    (s.entity && s.entityKind ?
+      '<a href="#/e/' + s.entityKind + '/' + encodeURIComponent(s.entity) + '">' + esc(s.entity) + ' 的原文出场 →</a>' : '') +
+    '</div>';
+  if (s.claim){
+    h += '<div class="claim"><span class="lb">' + s.claim.year + ' 年他说</span>「' + esc(s.claim.text) + '」' +
+      (s.claim.confidence ? '<div class="cf">确定程度：' + esc(s.claim.confidence) + '</div>' : '') + '</div>';
+  }
+  if ((s.timeline || []).length){
+    h += '<ul class="tl">';
+    s.timeline.forEach(function(t){
+      var kt = t.k === 'claim' ? '他说' : t.k === 'act' ? '动作' : '事实';
+      h += '<li class="' + t.k + '"><b>' + (t.y !== undefined ? t.y : '') + '</b><span class="tag">' + kt + '</span> ' +
+        esc(t.t) +
+        (t.loc ? ' <a class="src-link" href="#/l/' + encodeURIComponent(t.loc.l) + '?b=' + t.loc.b + '">原文 ↗</a>' : '') +
+        '</li>';
+    });
+    h += '</ul>';
+  }
+  if (s.outcome) h += '<div class="out"><span class="lb">结果</span>' + esc(s.outcome) + '</div>';
+  if (s.lesson) h += '<div class="out" style="margin-top:8px;background:var(--accent-soft)">' +
+    '<span class="lb" style="color:var(--accent)">教训</span>' + esc(s.lesson) + '</div>';
+  h += '<div class="src">出处：' + esc(s.src) + '</div></div>';
+  return h;
+}
+function locLink(loc, label){
+  if (!loc) return '';
+  return '<a class="src-link" href="#/l/' + encodeURIComponent(loc.l) + '?b=' + loc.b + '">' + (label || '原文 ↗') + '</a>';
+}
+/* 整块可点：把跳转目标挂在容器上，点句子任意位置都生效 */
+function jumpAttr(loc){
+  return loc ? ' data-jump="#/l/' + encodeURIComponent(loc.l) + '?b=' + loc.b + '"' : '';
+}
+
+/* ================= 第一步：公司记分牌（全量时间线） ================= */
+function companyPage(name){
+  var c = CT.companies[name];
+  /* 自动补录的公司只有原文出场、没有人工时间线，退回实体页而不是死路 */
+  if (!c){
+    if (IS_COMPANY[name]) return entity('companies', name);
+    return notFound('公司', name);
+  }
+  var ys = c.years || [], tl = c.timeline || [];
+  var h = '<div class="epath"><a href="#/">年表</a> · <a href="#/score">记分牌</a> · 公司</div>' +
+    '<h1 class="ename">' + esc(name) + '</h1>' +
+    '<div class="een">' + (c.en ? esc(c.en) + ' · ' : '') + '在 ' + ys.length + ' 个年份被提到 · ' +
+    '<a href="#/e/companies/' + encodeURIComponent(name) + '">看原文段落</a></div>';
+  if (c.intro) h += '<div class="esum">' + esc(c.intro) + '</div>';
+  if (c.history) h += '<div class="esum" style="border-left-color:#185fa5">' + esc(c.history) + '</div>';
+
+  // 记分牌卡片: 三层来源, 同一样式
+  //   1) build.py 逐条核对的 6 条   2) 人工整理的 15 家   3) 自动整理的其余公司
+  var cards = C.scorecard.filter(function(s){ return s.entity === name; });
+  if (cards.length){
+    h += '<h2 class="h2">已逐条核对的判断</h2>';
+    cards.forEach(function(s){ h += scCard(s, ''); });
+  } else if (CT.scorecards && CT.scorecards[name]){
+    var card = CT.scorecards[name];
+    h += '<h2 class="h2">记分牌 · ' + (card.auto ? '自动整理' : '人工整理') + '</h2>' + scCard(card, card.auto ? 'auto' : 'cur');
+  }
+
+  /* 年份轴只给"确实有记录"的年份绑定跳转。以前是按 c.years 点亮，
+     但 c.years 是"被提到的年份"（69 个），时间线只有 38 条，
+     点在没有条目的年份上就是按了没反应——实测正是这里最招人烦。 */
+  var set = {};
+  tl.forEach(function(t){ var yy = year0(t.y); if (yy) set[yy] = 1; });
+  var nY = Object.keys(set).length;
+  h += '<h2 class="h2">跨年轨迹 · ' + (nY === tl.length ? nY + ' 个年份' : tl.length + ' 条记录 · 覆盖 ' + nY + ' 个年份') + '</h2><div class="axis">';
+  for (var y = 1957; y <= 2025; y++){
+    h += '<div class="ax' + (set[y] ? ' on' : ' off') + '" data-cy="' + y + '" title="' +
+      (set[y] ? y + ' · 点这里跳到当年记录' : y + ' · 档案里这一年没有单独条目') + '">' + y + '</div>';
+  }
+  h += '</div>';
+
+  tl.forEach(function(t){
+    h += '<div class="trow' + (t.tbl ? ' tblrow' : '') + '"' + jumpAttr(t.loc) + '><div class="ty">' + esc(t.y) + '</div>' +
+      '<div class="tn">' + (t.tbl ? '<span class="tag autotag">持仓表</span> ' : '') +
+      (t.note ? esc(t.note) : '<span style="color:var(--ink3)">该年有提及</span>') +
+      locLink(t.loc, t.tbl ? '跳原文表格 ↗' : '原文 ↗') + '</div></div>';
+  });
+  return h;
+}
+
+/* ================= 第三步：认错与自我修正 ================= */
+var CORR_LB = {admit:'坦承', error:'认错', lesson:'教训', reverse:'事实反转'};
+function corr(){
+  var cs = CT.corrections || [], topics = CT.corrTopics || [];
+  var h = '<h1 class="h1">认错与自我修正</h1><p class="lead">' +
+    '成功可能是运气，认错才是确定的认知更新——因为只有他本人知道当初是怎么想的。<br>' +
+    '没有一个 CEO 会连续 60 年在公开信里认错。这里是他在信里亲口说出口的那些，' +
+    '按主题聚成档案，每条标年份和类别，<b>每条都可点回原文段落看上下文</b>。共 ' + cs.length + ' 条，跨 ' +
+    Object.keys(cs.reduce(function(a,c){ a[c.y]=1; return a; }, {})).length + ' 个年份。</p>';
+  h += '<div class="chips" style="margin-bottom:20px">' +
+    '<span class="chip chip-k" style="border-left:3px solid #185fa5">坦承</span>' +
+    '<span class="chip chip-k" style="border-left:3px solid var(--miss)">认错</span>' +
+    '<span class="chip chip-k" style="border-left:3px solid var(--accent)">教训</span>' +
+    '<span class="chip chip-k" style="border-left:3px solid #5b3f9e">事实反转</span></div>';
+
+  h += '<h2 class="h2">按主题归档 · ' + topics.length + ' 个</h2>';
+  topics.forEach(function(t){
+    h += '<div class="ct"><h3>' + entLink(t.ent, '', t.ent) + ' <span style="font-weight:400;font-size:12px;color:var(--ink3)">' +
+      t.items.length + ' 条</span></h3>';
+    t.items.forEach(function(c){
+      h += '<div class="ci ' + c.k + '"' + jumpAttr(c.loc) + '><b>' + c.y + '</b>' +
+        '<span class="tag">' + CORR_LB[c.k] + '</span> ' + esc(c.t) + locLink(c.loc) + '</div>';
+    });
+    h += '</div>';
+  });
+
+  h += '<h2 class="h2">全部 · 按年份</h2>';
+  cs.forEach(function(c){
+    h += '<div class="ci ' + c.k + '"' + jumpAttr(c.loc) + '><b>' + c.y + '</b>' +
+      '<span class="tag">' + CORR_LB[c.k] + '</span> ' +
+      (c.ent ? entLink(c.ent, 'enttag', '[' + c.ent + ']') + ' ' : '') +
+      esc(c.t) + locLink(c.loc) + '</div>';
+  });
+  return h;
+}
+
+/* ================= 第四步：决策规则库 ================= */
+var ruleQ = '';
+function rules(){
+  var rs = CT.rules || [];
+  var q = ruleQ.trim();
+  var out = q ? rs.filter(function(r){
+    return r.t.indexOf(q) !== -1 || String(r.y).indexOf(q) !== -1 || r.src.indexOf(q) !== -1;
+  }) : rs;
+  var h = '<h1 class="h1">决策规则库</h1><p class="lead">' +
+    '读完之后能带走的东西。' + rs.length + ' 条，全部为带年份的巴菲特原话（教训类摘要已移除，只留原话），' +
+    '每条标出处概念，可点回原文段落。直接搜——比如搜“回购”“杠杆”“管理层”。</p>';
+  h += '<div class="sbox"><input id="rq" placeholder="搜关键词，例如：回购 / 杠杆 / 管理层 / 1999" value="' + esc(q) + '">' +
+    '<button class="btn" id="rc">清空</button>' +
+    '<span style="font-size:12.5px;color:var(--ink3)">' + out.length + ' / ' + rs.length + ' 条</span></div>';
+  out.forEach(function(r){
+    var t = esc(r.t);
+    if (q) t = t.split(esc(q)).join('<mark>' + esc(q) + '</mark>');
+    h += '<div class="rule"' + jumpAttr(r.loc) + '><div class="rt">「' + t + '」</div><div class="rm">' +
+      '<b style="color:var(--accent)">' + r.y + '</b>' +
+      entLink(r.src, '', r.src) +
+      locLink(r.loc, '看原文 ↗') +
+      '<span class="tag p">原话</span></div></div>';
+  });
+  if (!out.length) h += '<div class="empty">没有匹配的规则</div>';
+  return h;
+}
+
+/* ================= 巴菲特午餐会 · 本地检索式问答 =================
+   不接大模型、不上传任何提问：在浏览器里把问题切成中文 n-gram，
+   对 98 封信（约 8 千个正文段落）算一遍 tf-idf，挑最相关的原文，
+   连同年份和段落号贴回来，每条都能点回原信。
+   这个体量（130 万字、8 千段）不需要向量库：字面检索就够快，
+   也没有 embedding 的构建、存储和调用成本；真接大模型时再把这里的 top-k 当上下文即可。 */
+var TALK = { msgs: [], draft: '', lastEnt: '', lastQ: '', asked: '', busy: false, seen: {},
+  session: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
+
+/* 线描茶杯：不依赖 emoji 字体，深浅背景下都能看清 */
+function cupSVG(size){
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0">' +
+    '<path d="M4 9.5h11v4.6a4.4 4.4 0 0 1-4.4 4.4H8.4A4.4 4.4 0 0 1 4 14.1z"/>' +
+    '<path d="M15 10.6h1.7a2.4 2.4 0 0 1 0 4.8H15"/>' +
+    '<path d="M7.2 5.6c0 1 .9 1.2.9 2.2M11 4.6c0 1.2.9 1.4.9 2.4"/>' +
+    '<path d="M3.4 20.8h13"/></svg>';
+}
+
+/* 虚词不参与切词：「你怎」「么看」这类碎片只会把结果带偏 */
+var TSTOP = '的了吗呢吧啊呀么怎你您我他她它这那有是会就要能可以什么为如何请告诉一下说说讲讲看想觉得把被让给对从到和与跟更最很太都也还又再就才只';
+function talkClean(q){
+  return String(q).replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+function talkTerms(q){
+  var out = [], seen = {};
+  function add(g, w){ if (!g || seen[g]) return; seen[g] = 1; out.push({ g: g, w: w }); }
+  talkClean(q).split(' ').forEach(function(run){
+    if (!run) return;
+    if (/^[A-Za-z0-9]+$/.test(run)){ add(run.toLowerCase(), 2); return; }
+    var n = run.length;
+    if (n >= 2 && n <= 8) add(run, 3);          // 整段短语权重最高
+    for (var i = 0; i + 2 <= n; i++){
+      var bg = run.slice(i, i + 2);
+      if (TSTOP.indexOf(bg.charAt(0)) < 0 && TSTOP.indexOf(bg.charAt(1)) < 0) add(bg, 1.2);
+    }
+    for (var j = 0; j + 3 <= n; j++){
+      var tg = run.slice(j, j + 3);
+      if (TSTOP.indexOf(tg.charAt(0)) < 0 && TSTOP.indexOf(tg.charAt(2)) < 0) add(tg, 2);
+    }
+  });
+  return out;
+}
+
+/* 段落库：只建一次。表格段落也收，但打分时降权（数字多、句子碎） */
+var TDOC = null, TDOCI = null;
+function talkDocs(){
+  if (TDOC) return TDOC;
+  var arr = [], map = {};
+  C.letters.forEach(function(l){
+    var L2 = L[l.id];
+    if (!L2) return;
+    L2.blocks.forEach(function(b, bi){
+      var t = blockText(b);
+      if (t.length < 30) return;
+      map[l.id + '|' + bi] = arr.length;
+      arr.push({ l: l.id, y: l.year, b: bi, t: t, p: b.k === 'p' ? 1 : 0 });
+    });
+  });
+  TDOCI = map;
+  TDOC = arr;
+  return arr;
+}
+
+function talkEnts(q){
+  var hit = [];
+  ['concepts', 'companies', 'people'].forEach(function(k){
+    C[k].forEach(function(e){ if (q.indexOf(e.name) !== -1) hit.push({ k: k, n: e.name }); });
+  });
+  hit.sort(function(a, b){ return b.n.length - a.n.length; });
+  return hit;
+}
+
+function talkRank(q, extraEnts){
+  var docs = talkDocs(), terms = talkTerms(q), N = docs.length;
+  if (!terms.length) return { picks: [], terms: terms };
+  terms.forEach(function(t){
+    var df = 0;
+    for (var i = 0; i < N; i++) if (docs[i].t.indexOf(t.g) !== -1) df++;
+    t.idf = Math.log(1 + N / (df + 1));
+  });
+  var scored = [];
+  for (var i = 0; i < N; i++){
+    var t = docs[i].t, s = 0;
+    for (var k = 0; k < terms.length; k++){
+      var tm = terms[k], p = t.indexOf(tm.g), c = 0;
+      if (p < 0) continue;
+      while (p >= 0 && c < 4){ c++; p = t.indexOf(tm.g, p + tm.g.length); }
+      s += tm.idf * tm.w * (1 + Math.log(c));
+    }
+    if (s <= 0) continue;
+    s = s / (1 + Math.log(1 + t.length / 140));
+    /* 附录里「（5）简单易懂的商业模式…，」这种条目是清单的一段，不是完整句子，
+       当"最接近的原文"读起来很别扭。稍微压一压，让说完整话的段落优先。 */
+    if (/^[（(]\s*\d+\s*[)）]/.test(t) || !/[。！？…”」』]$/.test(t)) s *= .82;
+    s += docs[i].p * .35;
+    scored.push({ i: i, s: s });
+  }
+  /* 问题里点名的实体，把它的出场段落直接拎上来，比字面分数可靠 */
+  var ents = (extraEnts || []).concat(talkEnts(q));
+  var boost = {};
+  ents.forEach(function(e){
+    (C.mentions[e.n] || []).forEach(function(m){
+      var idx = TDOCI[m[2] + '|' + m[1]];
+      if (idx != null) boost[idx] = 1;
+    });
+  });
+  var byIdx = {};
+  scored.forEach(function(x){ byIdx[x.i] = x.s; if (boost[x.i]) x.s += 8; });
+  Object.keys(boost).forEach(function(k){
+    var idx = +k;
+    if (byIdx[idx] == null) scored.push({ i: idx, s: 8 });
+  });
+  scored.sort(function(a, b){ return b.s - a.s; });
+
+  var picks = [], per = {};
+  function take(skipSeen){
+    for (var j = 0; j < scored.length && picks.length < 4; j++){
+      var d = docs[scored[j].i];
+      if (skipSeen && TALK.seen[d.l + '|' + d.b]) continue;
+      if ((per[d.l] || 0) >= 2) continue;      // 同一封信最多两段，避免一段话翻来覆去
+      per[d.l] = (per[d.l] || 0) + 1;
+      picks.push({ doc: d, s: scored[j].s });
+    }
+  }
+  take(true);
+  /* 追问时如果新段落不够，旧段落再补 —— 总比答"找不到"强 */
+  if (picks.length < 2){ per = {}; take(false); }
+  return { picks: picks, terms: terms };
+}
+
+/* 从问题里挑一个能拿去全文检索的关键词。
+   不能直接拿整句：「你怎么看科技股」原样丢进检索框，几乎什么都搜不到；
+   要的是那几个真正有信息量的字（科技股）。按 权重 × 稀有度 × 长度 挑最大的。 */
+function talkKey(terms){
+  var best = '', bs = -1;
+  (terms || []).forEach(function(t){
+    var g = t.g || '';
+    /* 带虚词的片段一律不要：「你怎么看科技股」整句也是一个词，稀有度极高，
+       一算就压过「科技股」，可拿去检索几乎什么都搜不到。 */
+    if (g.length < 2 || g.length > 6) return;
+    for (var i = 0; i < g.length; i++) if (TSTOP.indexOf(g.charAt(i)) >= 0) return;
+    var s = (t.w || 1) * (t.idf || 1) * (1 + (g.length - 2) * 0.35);
+    if (s > bs){ bs = s; best = g; }
+  });
+  return best;
+}
+
+function talkSnip(t, q, terms){
+  var p = t.indexOf(q);
+  if (p < 0) for (var i = 0; i < terms.length; i++){ p = t.indexOf(terms[i].g); if (p >= 0) break; }
+  if (p < 0) p = 0;
+  var start = Math.max(0, p - 80), end = Math.min(t.length, start + 230);
+  var s = t.slice(start, end).replace(/\s+/g, ' ');
+  return (start > 0 ? '…' : '') + s + (end < t.length ? '…' : '');
+}
+
+function talkQuote(d, text){
+  TALK.seen[d.l + '|' + d.b] = 1;
+  return '<div class="tq">' + esc(text) +
+    '<span class="src">' + d.y + ' 年 · <a href="#/l/' + encodeURIComponent(d.l) + '?b=' + d.b + '">读原文 ↗</a></span></div>';
+}
+
+function talkAnswer(q){
+  var qq = String(q).trim();
+  var ents = talkEnts(qq), ent = ents[0];
+
+  if (qq.length <= 12 && /(谢谢|多谢|感谢)/.test(qq)) return '<p>不客气。想接着问就接着问。</p>';
+
+  if (qq.length <= 14 && /^(你好|您好|hi|hello|嗨|在吗)/i.test(qq)){
+    return '<p>你好。我不替巴菲特编话——只把他在 98 封信里真正写过的段落找出来，附上年份和段落号。</p>' +
+      '<p>可以问一个概念（安全边际、能力圈）、一家公司（可口可乐、盖可保险），或者一个年份（1987 年股灾）。</p>';
+  }
+
+  if (/(你能做什么|能干什么|会什么|怎么用)/.test(qq)){
+    return '<p>我做三件事：</p><p>1. 概念或公司：把他跨年说过的话按时间排给你，附完整档案入口；<br>' +
+      '2. 大白话提问：在 98 封信里找最接近的段落，最多给 4 段；<br>' +
+      '3. 每条都带年份和段落号，点「读原文 ↗」直接跳到那一页。</p>' +
+      '<p>找不到就直说找不到，不会替他把话补完。</p>';
+  }
+
+  /* 概念：有档案就用档案摘要 + 原文段落 */
+  if (ent && ent.k === 'concepts' && CT.concepts[ent.n]){
+    var spec = CT.concepts[ent.n];
+    var ms = C.mentions[ent.n] || [];
+    var years = ms.map(function(m){ return m[0]; });
+    var h = '<p>「<b>' + esc(ent.n) + '</b>」在信里出现过 <b>' + fmt(ms.length + (C.overflow[ent.n] || 0)) + '</b> 次' +
+      (years.length ? '，从 ' + Math.min.apply(null, years) + ' 到 ' + Math.max.apply(null, years) : '') + '。</p>';
+    var rk = talkRank(qq, ents);
+    rk.picks.slice(0, 2).forEach(function(p){ h += talkQuote(p.doc, talkSnip(p.doc.t, talkClean(qq), rk.terms)); });
+    var lastP = spec.periods && spec.periods[spec.periods.length - 1];
+    if (lastP){
+      h += '<div class="talk-sum">档案把这段认识分成 ' + spec.periods.length + ' 段，最近一段（' +
+        lastP.y0 + '–' + lastP.y1 + '）的总结：' +
+        esc(lastP.text.length > 150 ? lastP.text.slice(0, 150) + '…' : lastP.text) + '</div>';
+    }
+    h += '<p><a href="#/c/' + encodeURIComponent(ent.n) + '">看「' + esc(ent.n) + '」的完整跨年档案 →</a></p>';
+    return h;
+  }
+
+  /* 公司：档案里的跨年轨迹 + 两段原文 */
+  if (ent && ent.k === 'companies'){
+    var co = CT.companies[ent.n] || null;
+    var tl = co ? (co.timeline || []) : [];
+    var rk2 = talkRank(qq, ents);
+    var h2 = '<p>「<b>' + esc(ent.n) + '</b>」原文出场 <b>' + fmt((C.mentions[ent.n] || []).length + (C.overflow[ent.n] || 0)) + '</b> 段' +
+      (tl.length ? '，人工档案里有 <b>' + tl.length + '</b> 条跨年记录（' + tl[0].y + '–' + tl[tl.length - 1].y + '）' : '') + '。</p>';
+    rk2.picks.slice(0, 2).forEach(function(p){ h2 += talkQuote(p.doc, talkSnip(p.doc.t, talkClean(qq), rk2.terms)); });
+    h2 += '<p><a href="#/co/' + encodeURIComponent(ent.n) + '">看「' + esc(ent.n) + '」的跨年轨迹 →</a></p>';
+    return h2;
+  }
+
+  /* 认错：这类问题字面检索容易翻到「不是我的错」之类的段落，
+     直接改走人工整理的认错档案，挑他最直白承认的几条 */
+  if (!ent && /(错误|认错|失误|教训|后悔|糟糕)/.test(qq)){
+    var cs2 = (CT.corrections || []).filter(function(c){ return /(错|失误|教训|后悔|糟糕)/.test(c.t); });
+    function cw(c){
+      var s = 0;
+      if (/最(大|糟|严重|惨)/.test(c.t)) s += 3;
+      if (/德克斯特|纺织|通用再保险/.test(c.t)) s += 2;   // 他自己反复点名的三大错
+      if (/我(犯|做|买|付)/.test(c.t)) s += 1;
+      if (c.k === 'error') s += 1;
+      return s * 10 + Math.max(0, c.y - 1980) / 10;
+    }
+    cs2.sort(function(a, b){ return cw(b) - cw(a) || b.y - a.y; });
+    if (cs2.length){
+      var h4 = '<p>他公开认过的错不少，最直白的几段是：</p>';
+      cs2.slice(0, 3).forEach(function(c){
+        h4 += '<div class="tq">' + esc(c.t) +
+          '<span class="src">' + c.y + ' 年 · <a href="#/l/' + encodeURIComponent(c.loc.l) + '?b=' + c.loc.b + '">读原文 ↗</a></span></div>';
+      });
+      h4 += '<p><a href="#/corr">看完整的 ' + (CT.corrections || []).length + ' 条认错档案 →</a></p>';
+      return h4;
+    }
+  }
+
+  /* 其余：纯原文检索；追问「他后来呢」时沿用上一轮的话题和实体 */
+  var follow = '';
+  if (!ent && TALK.lastEnt && qq.length <= 24 && /(他|它|这个|那个|后来|还有|再|呢)/.test(qq)) follow = TALK.lastEnt;
+  var extra = follow ? [{ n: follow }] : [];
+  var baseQ = (follow && TALK.lastQ) ? (TALK.lastQ + ' ' + qq) : qq;
+  var rk3 = talkRank(baseQ + (follow ? ' ' + follow : ''), extra);
+  if (!rk3.picks.length){
+    return '<p>这句话我在 98 封信里没找到对应的段落。换个说法试试，或者直接搜关键词。</p>' +
+      '<div class="tp-topics" style="max-width:540px;margin:12px 0 0">' + talkTopics() + '</div>';
+  }
+  var h3 = (follow ? '<p class="talk-follow">接着上面「' + esc(follow) + '」继续说：</p>' : '') +
+    '<p>找到 ' + rk3.picks.length + ' 段最接近的原文：</p>';
+  rk3.picks.forEach(function(p){ h3 += talkQuote(p.doc, talkSnip(p.doc.t, talkClean(qq), rk3.terms)); });
+  var kw = talkKey(rk3.terms) || talkClean(qq) || qq;
+  h3 += '<p><a href="#/q/' + encodeURIComponent(kw) + '">在全文检索里继续找「' + esc(kw) + '」→</a></p>';
+  return h3;
+}
+
+function talkTopics(){
+  var qs = ['你怎么看科技股？', '什么是安全边际？', '你怎么看通货膨胀？', '你犯过最大的错误是什么？'];
+  return qs.map(function(q, i){
+    return '<button class="tp-topic" data-q="' + esc(q) + '"><b>话题 ' + (i + 1) + '</b><span>' + esc(q) + '</span></button>';
+  }).join('');
+}
+
+function talkMsgs(){
+  return TALK.msgs.map(function(m, i){
+    if (m.r === 'u') return '<div class="msg u"><div class="bubble">' + esc(m.t) + '</div></div>';
+    var steps = (m.steps && m.steps.length)
+      ? '<div class="tp-steps' + (m.live ? ' live' : '') + '">' +
+        m.steps.map(function(s){ return '<div>· ' + esc(s) + '</div>'; }).join('') + '</div>'
+      : '';
+    /* 本地兜引擎给的是现成 HTML（m.h），agent 给的是待排版的原文（m.raw） */
+    var body;
+    if (m.live && !m.raw && !m.h) body = '<p class="ttyping">正在想一想该从哪儿翻起…</p>';
+    else if (m.h) body = m.h;
+    else body = fmtAns(m.raw || '') + (m.live ? '<span class="tp-caret"></span>' : '');
+    return '<div class="msg b" id="tm-' + i + '"><div class="ava">' + cupSVG(16) + '</div>' +
+      '<div class="bubble">' + steps + body + fmtSrcs(m.sources || []) + fmtMeta(m) + '</div></div>';
+  }).join('');
+}
+
+/* 回答里的行内标记：[[1964 巴菲特致合伙人信|101]] 变成能点回原文的胶囊，
+   [[web|网址]] 变成网络来源胶囊。引文用 > 起头，加粗用 **。 */
+function fmtCite(s){
+  return s.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, function(all, a, b){
+    if (a === 'web') return '<a class="ct-cite ct-web" href="' + b.replace(/&amp;/g, '&') +
+      '" target="_blank" rel="noopener">网络来源 ↗</a>';
+    var y = (a.match(/\d{4}/) || [''])[0];
+    return '<a class="ct-cite" href="#/l/' + encodeURIComponent(a) + '?b=' + encodeURIComponent(b) + '">' +
+      y + ' 年 · 读原文 ↗</a>';
+  });
+}
+function fmtAns(t){
+  var out = '', quote = false;
+  String(t).split('\n').forEach(function(ln){
+    var s = ln.replace(/\s+$/, '');
+    if (/^\s*>\s?/.test(s)){
+      if (!quote){ out += '<blockquote>'; quote = true; }
+      else out += '<br>';
+      out += fmtCite(esc(s.replace(/^\s*>\s?/, '')));
+      return;
+    }
+    if (quote){ out += '</blockquote>'; quote = false; }
+    var tr = s.trim();
+    if (!tr) return;
+    /* 模型时不时把小标题写成 ## 的形式，原样显示会很业余，去掉井号并加粗 */
+    var head = /^#{1,4}\s?/.test(tr);
+    if (head) tr = tr.replace(/^#{1,4}\s?/, '');
+    if (/^[-*]\s/.test(tr)) tr = tr.replace(/^[-*]\s/, '· ');
+    var line = fmtCite(esc(tr)).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    out += head ? '<p class="tp-h">' + line + '</p>' : '<p>' + line + '</p>';
+  });
+  if (quote) out += '</blockquote>';
+  return out;
+}
+/* 花了多少、查了几轮，摆在答案底下：接的是要花钱的模型，读者有权知道 */
+function fmtMeta(m){
+  if (!m) return '';
+  var bits = [];
+  if (m.rounds) bits.push('这一答他自己查了 ' + m.calls + ' 次资料、' + m.rounds + ' 轮');
+  if (m.usage && m.usage.total_tokens) bits.push('用了 ' + fmt(m.usage.total_tokens) + ' tokens');
+  if (!bits.length) return '';
+  return '<div class="tp-meta">' + bits.join(' · ') + '</div>';
+}
+function fmtSrcs(list){
+  if (!list || !list.length) return '';
+  return '<div class="tp-srcs"><b>这一答引用的出处（' + list.length + ' 条）</b>' +
+    list.map(function(s){
+      if (s.kind === 'letter'){
+        return '<a href="#/l/' + encodeURIComponent(s.l) + '?b=' + s.b + '">' + s.y + ' 年 · ' + esc(s.l) + ' 第 ' + s.b + ' 段</a>';
+      }
+      var host = '';
+      try { host = s.url.split('/')[2] || ''; } catch (e) {}
+      return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">网络 · ' + esc(host) + ' — ' + esc(String(s.title || '').slice(0, 46)) + '</a>';
+    }).join('') + '</div>';
+}
+
+/* 本地服务的地址：页面如果就是它自己托管的，用相对路径；
+   双击 html（file://）打开的，就直奔 127.0.0.1:8099。 */
+var TM = { online: null, base: '', model: 'flash', web: true, ctrl: null, probing: false };
+function talkBase(){
+  if (TM.base) return TM.base;
+  TM.base = (location.protocol === 'http:' || location.protocol === 'https:') ? '' : 'http://127.0.0.1:8099';
+  return TM.base;
+}
+function talkProbe(){
+  if (TM.probeP) return TM.probeP;
+  var seen = {}, tries = [];
+  [talkBase(), 'http://127.0.0.1:8099'].forEach(function(b){ if (!seen[b]){ seen[b] = 1; tries.push(b); } });
+  var n = 0;
+  function attempt(){
+    if (n >= tries.length){
+      TM.online = false;
+      if (route() === '/talk') talkUpdateState();
+      return Promise.resolve(false);
+    }
+    var b = tries[n++];
+    return fetch(b + '/api/health', { cache: 'no-store' }).then(function(r){ return r.json(); })
+      .then(function(j){
+        if (j && j.ok && j.key){ TM.base = b; TM.online = true; if (route() === '/talk') talkUpdateState(); return true; }
+        return attempt();
+      })
+      .catch(function(){ return attempt(); });
+  }
+  /* 探活不能无限等：最多 3 秒，超时就按离线处理，界面照常能用 */
+  TM.probeP = new Promise(function(res){
+    var timer = setTimeout(function(){ res(false); }, 3000);
+    attempt().then(function(ok){ clearTimeout(timer); res(ok); });
+  });
+  return TM.probeP;
+}
+
+/* 探活是异步的，结果回来时不能整页 render：那会把别人手里正在点的链接换成 0×0 的幽灵
+   （全站审计就是这么报出一条「#/talk 上的返回链接尺寸为 0」）。只改那两处文字。 */
+function talkStateText(){
+  return TM.online === true ? '已连接本地 Agent'
+    : TM.online === null ? '正在探活…' : '离线模式（关键词检索）';
+}
+function talkHeroP(){
+  if (TM.online === true) return '这是个会自己去查资料的 agent：他会在 98 封信里翻找，必要时上网核实，' +
+    '每句话都标出来处。不知道问什么？试试这些话题';
+  if (TM.online === null) return '正在连本地 Agent 服务…';
+  return '本地 Agent 服务没起来，现在是关键词检索模式。<br>想让他真会查资料、会联网，双击项目里的 <b>start.bat</b>。';
+}
+function talkUpdateState(){
+  var s = document.querySelector('.tp-state');
+  if (s){
+    s.className = 'tp-state ' + (TM.online === true ? 'on' : 'off');
+    s.innerHTML = '<i class="dot"></i>' + talkStateText();
+  }
+  var hp = document.querySelector('.tp-hero p');
+  if (hp) hp.innerHTML = talkHeroP();
+}
+
+function talkPage(){
+  var online = TM.online === true;
+  var body = TALK.msgs.length ? talkMsgs()
+    : '<div class="tp-hero"><div class="tp-cup">' + cupSVG(46) + '</div>' +
+      '<p>' + talkHeroP() + '</p><div class="tp-topics">' + talkTopics() + '</div></div>';
+  var state = '<span class="tp-state ' + (online ? 'on' : 'off') + '"><i class="dot"></i>' + talkStateText() + '</span>';
+  return '<div class="talk-page">' +
+    '<div class="tp-head"><div class="tp-brand">' + cupSVG(22) + '巴菲特午餐会' + state + '</div>' +
+      '<a class="tp-back" href="#/">← 返回知识库</a></div>' +
+    '<div class="tp-sub">拉把椅子，听老先生慢慢讲投资与人生 · 关于他本人说过什么，只回答查得到出处的部分</div>' +
+    '<div id="talk-body">' + body + '</div>' +
+    /* 输入框和它下面那排开关要一起粘在底部：单独粘输入框的话，
+       长答案滚到一半时开关就被挤出视口，等于没有。 */
+    '<div class="tp-bar">' +
+      '<div class="tp-composer">' +
+        '<button class="tp-new" id="talk-new">+ 新对话</button>' +
+        '<input id="talk-in" type="text" autocomplete="off" placeholder="请教巴菲特一个问题…" value="' + esc(TALK.draft) + '">' +
+        '<button class="tp-send" id="talk-send">提问</button>' +
+      '</div>' +
+      '<div class="tp-opts">' +
+        '<label><input type="checkbox" id="talk-web"' + (TM.web ? ' checked' : '') + '> 允许联网核实（信件之外的事才用）</label>' +
+        '<label><input type="checkbox" id="talk-pro"' + (TM.model === 'pro' ? ' checked' : '') + '> 深思模式（更慢、更细）</label>' +
+        '<button class="tp-stop" id="talk-stop" style="display:none">停止</button>' +
+      '</div>' +
+    '</div>' +
+    '<p class="tp-note">回答基于巴菲特公开信件整理，不构成任何投资建议。' +
+      (online ? '每条引文都能点回原信。' : '离线模式只在字面上匹配原文，不含推理。') + '</p>' +
+    '<p class="tp-mem">他会慢慢记住你是谁、关心什么（存在本机的 agent-memory.json 里）· ' +
+      '<button id="talk-forget">让他忘掉关于我的一切</button></p>' +
+  '</div>';
+}
+
+/* ---------- 提问 ----------
+   两条路：联得上本地服务就走 agent（会自己调工具、自己查几轮、自己记笔记）；
+   联不上就退回页面内的关键词检索，并且在界面上明说是离线模式 —— 不装。 */
+function talkAsk(q){
+  q = String(q || '').trim();
+  if (!q || TALK.busy) return;
+  TALK.busy = true;
+  TALK.draft = '';
+  TALK.msgs.push({ r: 'u', t: q });
+  TALK.msgs.push({ r: 'b', raw: '', steps: [], sources: [], live: true });
+  var idx = TALK.msgs.length - 1;
+  render();
+  talkScroll();
+
+  if (TM.online !== true){
+    talkProbe();
+    /* 探活是异步的，先把这次当离线答；下次进来就是 agent 了 */
+    talkLocalFallback(q, idx);
+    return;
+  }
+  talkStream(q, idx);
+}
+
+/* 关键词检索兜底：没有任何 AI，纯字面匹配，界面上会如实标注 */
+function talkLocalFallback(q, idx){
+  setTimeout(function(){
+    var a;
+    try { a = talkAnswer(q); }
+    catch (e) { a = '<p>检索时出了点问题：' + esc(e && e.message ? e.message : '未知错误') + '</p>'; }
+    TALK.msgs[idx] = { r: 'b', h: a };
+    var e2 = talkEnts(q)[0];
+    if (e2) TALK.lastEnt = e2.n;
+    TALK.lastQ = e2 ? e2.n : q;
+    TALK.busy = false;
+    /* 人可能已经点走了：答案留在 TALK.msgs 里，等回到对话页再看，
+       绝不在这里重绘 —— 否则会把别的页面整个换掉、还把人滚回顶部 */
+    if (route() === '/talk'){
+      render();
+      talkScroll();
+    }
+  }, 40);
+}
+
+function talkScroll(){
+  if (route() !== '/talk') return;
+  var last = document.querySelector('#talk-body .msg:last-child');
+  if (last) last.scrollIntoView({ block: 'end' });
+}
+
+/* 只重画这一条气泡，不整页 render —— 流式打字时整页重绘会把输入框的光标弄丢 */
+function talkPaint(idx){
+  if (route() !== '/talk') return;
+  var m = TALK.msgs[idx];
+  if (!m) return;
+  var root = document.getElementById('tm-' + idx);
+  if (!root) return;
+  var steps = root.querySelector('.tp-steps');
+  var box = root.querySelector('.bubble');
+  if (!box) return;
+  var html = '';
+  if (m.steps && m.steps.length){
+    html += '<div class="tp-steps' + (m.live ? ' live' : '') + '">' +
+      m.steps.map(function(s){ return '<div>· ' + esc(s) + '</div>'; }).join('') + '</div>';
+  }
+  html += m.live && !m.raw ? '<p class="ttyping">正在想一想该从哪儿翻起…</p>'
+    : fmtAns(m.raw || '') + (m.live ? '<span class="tp-caret"></span>' : '');
+  html += fmtSrcs(m.sources || []) + fmtMeta(m);
+  box.innerHTML = html;
+  talkScroll();
+}
+
+function talkStream(q, idx){
+  var stop = document.getElementById('talk-stop');
+  if (stop) stop.style.display = 'inline-block';
+  TM.ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+  fetch(talkBase() + '/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: q, session: TALK.session, web: TM.web, model: TM.model }),
+    signal: TM.ctrl ? TM.ctrl.signal : undefined
+  }).then(function(res){
+    if (!res.ok) throw new Error('本地服务返回 ' + res.status);
+    var reader = res.body.getReader(), dec = new TextDecoder(), buf = '', ev = '';
+    function pump(){
+      return reader.read().then(function(r){
+        if (r.done){ talkFinish(idx, null); return; }
+        buf += dec.decode(r.value, { stream: true });
+        var lines = buf.split('\n');
+        buf = lines.pop();
+        lines.forEach(function(line){
+          if (line.indexOf('event: ') === 0){ ev = line.slice(7).trim(); return; }
+          if (line.indexOf('data: ') !== 0) return;
+          var d = null;
+          try { d = JSON.parse(line.slice(6)); } catch (e) { return; }
+          talkEvent(ev, d, idx);
+        });
+        return pump();
+      });
+    }
+    return pump();
+  }).catch(function(e){
+    if (e && e.name === 'AbortError'){ talkFinish(idx, '已停止'); return; }
+    /* 服务掉了：这一问退回本地检索，并且把状态标成离线 */
+    TM.online = false;
+    TALK.msgs[idx] = { r: 'b', h: '<p>连不上本地 Agent 服务了（' + esc(e && e.message ? e.message : '未知原因') + '）。' +
+      '这一问先按关键词检索作答：</p>' };
+    try {
+      TALK.msgs[idx].h = '<p>连不上本地 Agent 服务。这一问先按关键词检索作答：</p>' + talkAnswer(q);
+    } catch (e2) { TALK.msgs[idx].h += '<p>（本地检索也失败了）</p>'; }
+    talkFinish(idx, null);
+  });
+}
+
+function talkEvent(ev, d, idx){
+  var m = TALK.msgs[idx];
+  if (!m) return;
+  if (ev === 'step'){ m.steps.push(d.text); talkPaint(idx); }
+  else if (ev === 'delta'){ m.raw += d.text; talkPaint(idx); }
+  else if (ev === 'reset'){ m.raw = ''; talkPaint(idx); }   // 这一轮它改主意去查工具了，刚才那半句不算答案
+  else if (ev === 'sources'){ m.sources = d.sources || []; talkPaint(idx); }
+  else if (ev === 'note'){ m.note = d.text; }
+  else if (ev === 'error'){ talkFinish(idx, d.message); }
+  else if (ev === 'usage'){ m.usage = d; }
+  else if (ev === 'done'){
+    m.rounds = d.rounds; m.calls = d.calls;
+    talkFinish(idx, null);
+  }
+}
+
+function talkFinish(idx, err){
+  var m = TALK.msgs[idx];
+  if (m){
+    m.live = false;
+    if (err) m.err = err;
+    /* 只有写坏的标记（缺竖线的那种）才删掉，正常的 [[信|段]] 要留着 ——
+       它们正是页面上那些能点回原文的胶囊，删了就一颗不剩了。 */
+    m.raw = String(m.raw || '').replace(/\[\[[^\]|]*\]\]/g, '');
+    if (m.note) m.raw += '\n\n> ' + m.note;
+    if (err) m.raw += '\n\n> ' + err;
+  }
+  TALK.busy = false;
+  var stop = document.getElementById('talk-stop');
+  if (stop) stop.style.display = 'none';
+  if (route() === '/talk'){ talkPaint(idx); }
+}
+
+/* ---------- 路由 ---------- */
+/* 同一条路由内的重绘（提问、搜索框输入）不该把页面拉回顶部；
+   只有真正换页才回顶。否则在长信里打字、在对话页等回答，都会被弹回开头。 */
+var LASTROUTE = null;
+function render(){
+  var hx = route();
+  var sameRoute = (hx === LASTROUTE);
+  var app = document.getElementById('app');
+  var p = hx.split('/');
+  var html = '';
+  if (p[1] === 'l') html = letter(dec(p.slice(2).join('/')));
+  else if (p[1] === 'y' && p[2]){
+    var yy = +p[2];
+    // 年份必须是合理数字，否则 #/y/abc 会渲染出一个"abc 年不在收录范围"的怪页面
+    html = (yy >= 1800 && yy <= 2200) ? yearPage(yy) : notFound('年份', dec(p[2]));
+  }
+  else if (p[1] === 'e' && p[2]) html = entity(p[2], dec(p.slice(3).join('/')));
+  else if (p[1] === 'c' && p[2]) html = conceptPage(dec(p.slice(2).join('/')));
+  else if (p[1] === 'co' && p[2]) html = companyPage(dec(p.slice(2).join('/')));
+  else if (p[1] === 'concept') html = concepts();
+  else if (p[1] === 'corr') html = corr();
+  else if (p[1] === 'rules') html = rules();
+  else if (p[1] === 'score') html = score();
+  else if (p[1] === 'decide') html = decide();
+  else if (p[1] === 'letters') html = lettersPage();
+  else if (p[1] === 'ents') html = ents();
+  else if (p[1] === 'talk') html = talkPage();
+  else if (p[1] === 'q' && p[2]) html = searchPage(dec(p.slice(2).join('/')));
+  else if (!p[1]) html = home();
+  else html = notFound('页面', dec(p.slice(1).join('/')));
+  var shellCls = p[1] ? 'app-page' : 'app-home';
+  if (p[1] === 'l') shellCls += ' app-read';
+  try { app.setAttribute('class', shellCls); } catch (e) { try { app.className = shellCls; } catch (e2) {} }
+  app.innerHTML = html;
+  markNav();
+  bind();
+  /* 首页那三条示例问题带 ?q= 进来，落地就替用户问出去（同一句只自动问一次） */
+  if (p[1] === 'talk'){
+    talkProbe();          // 探一下本地 Agent 在不在，决定这一页是走 agent 还是走离线检索
+    var qm = location.hash.match(/[?&]q=([^&]*)/);
+    if (qm){
+      var autoQ = dec(qm[1]);
+      if (autoQ && TALK.asked !== autoQ){
+        TALK.asked = autoQ;
+        /* 60ms 里人可能已经点走了。talkAsk 一进来就 render()，不判一下的话
+           会把用户正看着的那一页整个重画：光标丢、滚动位置丢，元素引用也全作废
+           （审计里就是这样把「正在点的那个链接」换成 0×0 的幽灵，误报遮挡）。
+           另外这一问必须等探活结束：不然会因为 online 还是未知而降级成关键词检索。 */
+        setTimeout(function(){
+          if (route() !== '/talk') return;
+          talkProbe().then(function(){ if (route() === '/talk') talkAsk(autoQ); });
+        }, 60);
+      }
+    }
+  }
+  /* 全站开了 smooth 滚动，若沿用会把"切页回顶"变成一段动画，
+     中途看起来像没跳转。切页这一下必须瞬时归零。 */
+  if (!sameRoute){
+    var de = document.documentElement, sbv = de.style.scrollBehavior;
+    de.style.scrollBehavior = 'auto';
+    window.scrollTo(0, 0);
+    de.style.scrollBehavior = sbv;
+  }
+  LASTROUTE = hx;
+}
+
+function bind(){
+  var tin = document.getElementById('talk-in');
+  if (tin){
+    tin.oninput = function(){ TALK.draft = tin.value; };
+    tin.onkeydown = function(ev){ if (ev.key === 'Enter'){ ev.preventDefault(); talkAsk(tin.value); } };
+    document.getElementById('talk-send').onclick = function(){ talkAsk(tin.value); };
+    document.getElementById('talk-new').onclick = function(){
+      TALK.msgs = []; TALK.draft = ''; TALK.lastEnt = ''; TALK.lastQ = ''; TALK.asked = ''; TALK.seen = {};
+      /* 换会话 = 换一段新的上下文，但长期记忆是跨会话的，不清 */
+      TALK.session = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      render();
+    };
+    document.querySelectorAll('.tp-topic').forEach(function(el){
+      el.onclick = function(){ talkAsk(el.dataset.q); };
+    });
+    var tw = document.getElementById('talk-web');
+    if (tw) tw.onchange = function(){ TM.web = !!tw.checked; };
+    var tp = document.getElementById('talk-pro');
+    if (tp) tp.onchange = function(){ TM.model = tp.checked ? 'pro' : 'flash'; };
+    var ts = document.getElementById('talk-stop');
+    if (ts) ts.onclick = function(){
+      if (TM.ctrl) TM.ctrl.abort();
+      else { TALK.busy = false; ts.style.display = 'none'; }
+    };
+    var tf = document.getElementById('talk-forget');
+    if (tf) tf.onclick = function(){
+      fetch(talkBase() + '/api/memory', { method: 'DELETE' }).then(function(){
+        tf.parentNode.innerHTML = '已经让他忘掉关于你的一切了。';
+      }).catch(function(){
+        tf.parentNode.innerHTML = '清不掉（本地服务没起来），记忆还在 agent-memory.json 里。';
+      });
+    };
+  }
+  document.querySelectorAll('.yr').forEach(function(el){
+    el.onclick = function(){ go('#/y/' + el.dataset.y); };
+  });
+  document.querySelectorAll('.feat[data-f]').forEach(function(el){
+    el.onclick = function(){
+      var t = el.dataset.f;
+      if (t === '记分牌') go('#/score');
+      else if (t === '决策卡') go('#/decide');
+      else if (t === '实体跨年追踪') go('#/ents');
+      else go('#/l/' + encodeURIComponent('1988 巴菲特致股东信'));
+    };
+  });
+  // 入门导引：点卡片 -> 进该路径第一个概念, 没有则跳到导引第一个年份的信
+  document.querySelectorAll('.pcard').forEach(function(el){
+    el.onclick = function(){
+      var p = null;
+      (CT.paths || []).forEach(function(x){ if (x.id === el.dataset.p) p = x; });
+      if (!p) return;
+      if ((p.concepts || []).length) go('#/c/' + encodeURIComponent(p.concepts[0]));
+      else if ((p.years || []).length) openYear(p.years[0]);
+    };
+  });
+  // 公司页年份轴：点年份滚到对应行
+  document.querySelectorAll('.ax.on').forEach(function(el){
+    el.onclick = function(){
+      var y = el.dataset.cy;
+      var rows = document.querySelectorAll('.trow');
+      for (var i = 0; i < rows.length; i++){
+        var ty = rows[i].querySelector('.ty');
+        if (ty && ty.textContent.indexOf(y) === 0){
+          rows[i].scrollIntoView({block:'center'});
+          rows[i].style.background = 'var(--accent-soft)';
+          return;
+        }
+      }
+    };
+  });
+  // 规则库搜索
+  var rq = document.getElementById('rq');
+  if (rq){
+    rq.oninput = function(){
+      ruleQ = rq.value;
+      var pos = rq.selectionStart;
+      render();
+      var r2 = document.getElementById('rq');
+      if (r2){ r2.focus(); r2.setSelectionRange(pos, pos); }
+    };
+    var rc = document.getElementById('rc');
+    if (rc) rc.onclick = function(){ ruleQ = ''; render(); };
+  }
+  // 记分牌公司搜索
+  var cq = document.getElementById('cq');
+  if (cq){
+    cq.oninput = function(){
+      coQ = cq.value;
+      var pos = cq.selectionStart;
+      render();
+      var c2 = document.getElementById('cq');
+      if (c2){ c2.focus(); c2.setSelectionRange(pos, pos); }
+    };
+    var cc = document.getElementById('cc');
+    if (cc) cc.onclick = function(){ coQ = ''; render(); };
+  }
+  document.querySelectorAll('.ent').forEach(function(el){
+    el.onclick = function(ev){
+      if (ev && ev.stopPropagation) ev.stopPropagation();   // 别让外层整块跳转覆盖
+      go('#/e/' + el.dataset.k + '/' + encodeURIComponent(el.dataset.e));
+    };
+  });
+  /* 整块可点：点条目任意位置进原文；内部链接优先走自己的目标 */
+  document.querySelectorAll('[data-jump]').forEach(function(el){
+    el.onclick = function(ev){
+      var t = ev && ev.target;
+      if (t && (t.tagName === 'A' || (t.parentNode && t.parentNode.tagName === 'A'))) return;
+      go(el.dataset.jump);
+    };
+  });
+  document.querySelectorAll('.snip').forEach(function(el){
+    el.onclick = function(){ go('#/l/' + encodeURIComponent(el.dataset.go) + '?b=' + el.dataset.b); };
+  });
+  document.querySelectorAll('.opt[data-d]').forEach(function(el){
+    el.onclick = function(){
+      picks[el.dataset.d] = +el.dataset.i;
+      render();
+    };
+  });
+  var up = document.getElementById('t-up'), dn = document.getElementById('t-dn');
+  if (up || dn){
+    var id = dec(route().split('/').slice(2).join('/'));
+    var idx = C.letters.findIndex(function(l){ return l.id === id; });
+    if (up) up.onclick = function(){ if (idx > 0) go('#/l/' + encodeURIComponent(C.letters[idx-1].id)); };
+    if (dn) dn.onclick = function(){ if (idx >= 0 && idx < C.letters.length-1) go('#/l/' + encodeURIComponent(C.letters[idx+1].id)); };
+  }
+  var bnum = hashNum('b');
+  if (bnum !== null){
+    var t = document.getElementById('b' + bnum);
+    if (t){
+      t.classList.add('cur');
+      /* 长信有两万多像素，60ms 后滚动时下半页可能还没排完版，滚到位又会被顶下去。
+         滚完回头量一次，没进视口就再来一遍（最多三次），避免看着像没跳。 */
+      var tries = 0;
+      (function align(){
+        t.scrollIntoView({block:'center'});
+        if (++tries >= 3) return;
+        setTimeout(function(){
+          var r = t.getBoundingClientRect();
+          if (r.top < -40 || r.top > window.innerHeight - 80) align();
+        }, 240);
+      })();
+    }
+  }
+}
+
+/* ================= 侧栏 · 搜索 · 折叠 ================= */
+function sgroup(id, title, items, open){
+  var h = '<div class="nav-group"><div class="nav-group-title' + (open ? ' open' : '') +
+    '" data-g="' + id + '"><span class="caret"></span>' + title +
+    '<span class="badge">' + items.length + '</span></div>' +
+    '<div class="nav-group-items' + (open ? ' open' : '') + '" id="g_' + id + '">';
+  items.forEach(function(it){
+    h += '<a href="' + it[0] + '" class="nav-link" data-n="' + it[1] + '" title="' + esc(it[2]) + '">' +
+      esc(it[2]) + '</a>';
+  });
+  return h + '</div></div>';
+}
+function buildSidebar(){
+  var el = document.getElementById('snav');
+  if (!el) return;
+  var h = '<a href="#/" class="nav-link nav-home" data-n="/">🏛 首页</a>';
+  h += '<a href="#/talk" class="nav-link nav-talk" data-n="/talk">☕ 巴菲特午餐会</a>';
+  h += '<div class="search-box"><input type="text" id="q" placeholder="搜索信件 / 概念 / 公司…" autocomplete="off">' +
+       '<div id="qres"></div></div>';
+  h += sgroup('idx', '索引', [
+    ['#/letters', '/letters', '全部信件'],
+    ['#/ents', '/ents', '实体总览'],
+    ['#/score', '/score', '公司记分牌'],
+    ['#/concept', '/concept', '术语演化'],
+    ['#/corr', '/corr', '认错档案'],
+    ['#/rules', '/rules', '规则库'],
+    ['#/decide', '/decide', '决策卡']
+  ], true);
+
+  function letters(kind){
+    return C.letters.filter(function(l){ return l.kind === kind; }).map(function(l){
+      return ['#/l/' + encodeURIComponent(l.id), '/l/' + encodeURIComponent(l.id), l.id];
+    });
+  }
+  h += sgroup('partner', '合伙人信', letters('partnership'), false);
+  h += sgroup('berk', '伯克希尔股东信', letters('berkshire'), false);
+  h += sgroup('special', '特别信件', letters('special'), false);
+
+  function entGroup(kind, label){
+    return C[kind].slice().sort(function(a, b){ return entCount(b.name) - entCount(a.name); })
+      .map(function(e){
+        var href = entHref(e.name) || ('#/e/' + kind + '/' + encodeURIComponent(e.name));
+        return [href, href.slice(1), e.name];
+      });
+  }
+  h += sgroup('concept', '概念', entGroup('concepts'), false);
+  h += sgroup('company', '公司', entGroup('companies'), false);
+  h += sgroup('people', '人物', entGroup('people'), false);
+  el.innerHTML = h;
+}
+function markNav(){
+  var cur = (location.hash.slice(1).split('?')[0]) || '/';
+  var activeEl = null;
+  document.querySelectorAll('#snav .nav-link').forEach(function(a){
+    var on = a.getAttribute('data-n') === cur;
+    a.classList.toggle('active', on);
+    if (on) activeEl = a;
+  });
+  /* 跳转后侧栏必须给出可见反馈：当前项若在折叠分组里，展开它并滚到可见，
+     否则用户看不出页面已经换了（会被当成“点了没反应”） */
+  if (activeEl){
+    var items = activeEl.parentNode;
+    if (items && items.classList && items.classList.contains('nav-group-items') && !items.classList.contains('open')){
+      items.classList.add('open');
+      var t = document.querySelector('.nav-group-title[data-g="' + items.id.slice(2) + '"]');
+      if (t) t.classList.add('open');
+    }
+    try { activeEl.scrollIntoView({block:'nearest'}); } catch(e){}
+  }
+}
+function wireGroups(){
+  document.querySelectorAll('#snav .nav-group-title').forEach(function(t){
+    t.onclick = function(){
+      var g = document.getElementById('g_' + t.getAttribute('data-g'));
+      if (!g) return;
+      var on = !g.classList.contains('open');
+      g.classList.toggle('open', on);
+      t.classList.toggle('open', on);
+    };
+  });
+}
+var qTimer;
+function doSearch(q, box){
+  q = (q || '').trim();
+  if (!q){ box.setAttribute('class', ''); box.innerHTML = ''; return; }
+  var res = [], seen = {};
+  function push(o){ if (seen[o.href]) return; seen[o.href] = 1; res.push(o); }
+  [['companies', '公司', C.companies], ['concepts', '概念', C.concepts], ['people', '人物', C.people]].forEach(function(g){
+    g[2].forEach(function(e){
+      if (e.name.indexOf(q) !== -1 ||
+          (e.en && e.en.toLowerCase().indexOf(q.toLowerCase()) !== -1)){
+        push({href: entHref(e.name) || '#/ents', t: e.name, ty: g[1],
+              s: (e.summary || e.en || '').slice(0, 58)});
+      }
+    });
+  });
+  C.letters.forEach(function(l){
+    if (l.id.indexOf(q) !== -1){
+      push({href: '#/l/' + encodeURIComponent(l.id), t: l.id, ty: '信件',
+            s: l.n + ' 段 · ' + (l.chars / 1000).toFixed(1) + ' 千字'});
+    }
+  });
+  var hit = 0;
+  for (var id in L){
+    if (hit >= 6) break;
+    var bs = L[id].blocks;
+    for (var i = 0; i < bs.length; i++){
+      var tx = blockText(bs[i]);
+      var pp = tx.indexOf(q);
+      if (pp !== -1){
+        push({href: '#/l/' + encodeURIComponent(id) + '?b=' + i, t: id, ty: '原文',
+              s: (pp > 22 ? '…' : '') + tx.slice(Math.max(0, pp - 22), pp + 48) + '…'});
+        hit++;
+        break;
+      }
+    }
+  }
+  var out = '';
+  res.slice(0, 14).forEach(function(r){
+    out += '<a class="sr-item" href="' + r.href + '"><span class="sr-title">' + esc(r.t) + '</span>' +
+      '<span class="sr-type">' + r.ty + '</span>' +
+      '<span class="sr-snippet">' + esc(r.s) + '</span></a>';
+  });
+  out += '<a class="sr-all" href="' + searchHref(q) + '">看「' + esc(q) + '」的全部结果 →</a>';
+  box.innerHTML = out;
+  box.setAttribute('class', 'on');
+}
+function wireSearch(){
+  var q = document.getElementById('q'), box = document.getElementById('qres');
+  if (!q || !box) return;
+  q.oninput = function(){
+    clearTimeout(qTimer);
+    qTimer = setTimeout(function(){ doSearch(q.value, box); }, 130);
+  };
+  q.onkeydown = function(ev){
+    if (!ev) return;
+    if (ev.key === 'Escape'){ q.value = ''; box.setAttribute('class', ''); }
+    if (ev.key === 'Enter'){
+      var a = box.querySelector('.sr-item');
+      if (a) go(a.getAttribute('href'));
+    }
+  };
+  box.onclick = function(ev){
+    if (ev && ev.target && ev.target.tagName === 'A') box.setAttribute('class', '');
+  };
+}
+(function shellInit(){
+  try {
+    buildSidebar();
+    wireGroups();
+    wireSearch();
+    var hb = document.getElementById('hamb'), sb = document.getElementById('sidebar'), sc = document.getElementById('scrim');
+    if (hb && sb && sc){
+      hb.onclick = function(){ sb.classList.toggle('open'); sc.classList.toggle('on'); };
+      sc.onclick = function(){ sb.classList.remove('open'); sc.classList.remove('on'); };
+      sb.onclick = function(ev){
+        if (ev && ev.target && ev.target.tagName === 'A'){
+          sb.classList.remove('open'); sc.classList.remove('on');
+        }
+      };
+    }
+  } catch (e) {}
+})();
+
+var fcEl = document.getElementById('foot-chars');
+if (fcEl) fcEl.textContent = fmt(TOTCHARS);
+
+window.onhashchange = render;
+
+/* 同址链接再点一次不该没反应：地址没变不会触发 hashchange。
+   带 ?b= 的直接滚回那一段，其余重画一页。 */
+if (document.addEventListener) document.addEventListener('click', function(ev){
+  var a = ev.target;
+  while (a && a !== document.body && a.tagName !== 'A') a = a.parentNode;
+  if (!a || a.tagName !== 'A') return;
+  var href = a.getAttribute('href');
+  if (!href || href.charAt(0) !== '#') return;
+  var same = href === location.hash || (href === '#/' && (location.hash === '' || location.hash === '#'));
+  if (!same) return;
+  ev.preventDefault();
+  var m = href.match(/[?&]b=(\d+)/);
+  if (m){
+    var t = document.getElementById('b' + m[1]);
+    if (t){ t.scrollIntoView({block: 'center'}); return; }
+  }
+  render();
+}, false);
+
+render();
+
+/* 数据到位、首屏画完才撤掉加载提示 */
+(function(){
+  var b = document.getElementById('boot');
+  if (!b) return;
+  try { b.parentNode.removeChild(b); } catch (e) { b.style.display = 'none'; }
+})();
+</script>
+</body>
+</html>

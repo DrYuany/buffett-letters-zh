@@ -1,0 +1,34 @@
+# DeepSeek 密钥：只存在本机，绝不入库。
+# （这串密钥曾在聊天里明文出现过，建议到 DeepSeek 后台轮换一次。）
+_agent.key
+*.key
+
+# agent 的长期记忆是本机的读者笔记，含个人偏好，不入库
+agent-memory.json
+
+# 审计 / 排查的过程产物
+_agent.log
+_audit*.log
+_rendered_text.json
+_inline.js
+_csscheck.js
+_actaudit.json
+_linkaudit.json
+_t*.txt
+
+# 截图工作目录（几十 MB，临时看效果用）。README 用的图在 docs/screenshots/
+shots/
+
+# 备份与改版前的旧稿
+*.bak
+*.bak-home
+index.pre-redesign.html
+
+# 系统
+.DS_Store
+Thumbs.db
+node_modules/
+
+# 语料来源是第三方仓库 https://github.com/Sphinm/buffett-letters.git 的克隆（自带 .git）。
+# 它不进本仓库，README 里注明出处与 commit；站点所需数据已由 build.py 生成进 site/data-*.js。
+_src/

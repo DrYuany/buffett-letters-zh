@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="读巴菲特 股东信知识库">
+  <title>读巴菲特 · 股东信知识库</title>
+  <desc>同心金徽：外环六枚节点对应六个入口（信件·概念·公司·人物·记分牌·规则），中心复利曲线自左下扬向右上。</desc>
+  <defs>
+    <linearGradient id="rbGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B6914"/>
+      <stop offset="28%" stop-color="#B8860B"/>
+      <stop offset="52%" stop-color="#E8C35E"/>
+      <stop offset="78%" stop-color="#B8860B"/>
+      <stop offset="100%" stop-color="#8B6914"/>
+    </linearGradient>
+    <linearGradient id="rbStroke" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#B8860B"/>
+      <stop offset="55%" stop-color="#E8C35E"/>
+      <stop offset="100%" stop-color="#9A7209"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="100" cy="100" r="92" fill="none" stroke="url(#rbGold)" stroke-width="3"/>
+  <circle cx="100" cy="100" r="78" fill="none" stroke="url(#rbGold)" stroke-width="1" opacity=".7"/>
+  <circle cx="100" cy="100" r="55" fill="none" stroke="url(#rbGold)" stroke-width="1.5" opacity=".55"/>
+
+  <g fill="url(#rbGold)">
+    <circle cx="178" cy="100" r="5.5"/>
+    <circle cx="139" cy="167.5" r="5.5"/>
+    <circle cx="61" cy="167.5" r="5.5"/>
+    <circle cx="22" cy="100" r="5.5"/>
+    <circle cx="61" cy="32.5" r="5.5"/>
+    <circle cx="139" cy="32.5" r="5.5"/>
+  </g>
+
+  <circle cx="100" cy="100" r="52" fill="none" stroke="url(#rbGold)" stroke-width="2"/>
+  <path d="M72 127 C 90 124, 99 110, 108 94 S 122 72, 128 68"
+        fill="none" stroke="url(#rbStroke)" stroke-width="5" stroke-linecap="round"/>
+  <g fill="#9A7209">
+    <circle cx="72" cy="127" r="4"/>
+    <circle cx="108" cy="94" r="4"/>
+    <circle cx="128" cy="68" r="4"/>
+  </g>
+  <path d="M64 140 L136 140" stroke="url(#rbGold)" stroke-width="1" opacity=".45"/>
+</svg>

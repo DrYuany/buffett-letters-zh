@@ -1,0 +1,1055 @@
+[
+ {
+  "name": "BNSF铁路",
+  "kind": "companies",
+  "ny": 16,
+  "span": 16,
+  "y0": 2009,
+  "y1": 2024,
+  "hits": 205
+ },
+ {
+  "name": "IBM",
+  "kind": "companies",
+  "ny": 13,
+  "span": 53,
+  "y0": 1964,
+  "y1": 2016,
+  "hits": 41
+ },
+ {
+  "name": "三井物产",
+  "kind": "companies",
+  "ny": 1,
+  "span": 1,
+  "y0": 2021,
+  "y1": 2021,
+  "hits": 1
+ },
+ {
+  "name": "三菱商事",
+  "kind": "companies",
+  "ny": 1,
+  "span": 1,
+  "y0": 2021,
+  "y1": 2021,
+  "hits": 1
+ },
+ {
+  "name": "世界图书百科全书",
+  "kind": "companies",
+  "ny": 15,
+  "span": 15,
+  "y0": 1985,
+  "y1": 1999,
+  "hits": 36
+ },
+ {
+  "name": "中国石油",
+  "kind": "companies",
+  "ny": 5,
+  "span": 5,
+  "y0": 2003,
+  "y1": 2007,
+  "hits": 11
+ },
+ {
+  "name": "中美能源",
+  "kind": "companies",
+  "ny": 19,
+  "span": 27,
+  "y0": 1999,
+  "y1": 2025,
+  "hits": 189
+ },
+ {
+  "name": "伊斯卡",
+  "kind": "companies",
+  "ny": 8,
+  "span": 8,
+  "y0": 2007,
+  "y1": 2014,
+  "hits": 34
+ },
+ {
+  "name": "伊藤忠商事",
+  "kind": "companies",
+  "ny": 3,
+  "span": 5,
+  "y0": 2020,
+  "y1": 2024,
+  "hits": 4
+ },
+ {
+  "name": "伯克希尔哈撒韦",
+  "kind": "companies",
+  "ny": 61,
+  "span": 61,
+  "y0": 1965,
+  "y1": 2025,
+  "hits": 3710
+ },
+ {
+  "name": "伯克希尔哈撒韦能源",
+  "kind": "companies",
+  "ny": 6,
+  "span": 7,
+  "y0": 2014,
+  "y1": 2020,
+  "hits": 11
+ },
+ {
+  "name": "克莱顿房屋",
+  "kind": "companies",
+  "ny": 18,
+  "span": 18,
+  "y0": 2003,
+  "y1": 2020,
+  "hits": 35
+ },
+ {
+  "name": "内布拉斯加家具店",
+  "kind": "companies",
+  "ny": 37,
+  "span": 43,
+  "y0": 1983,
+  "y1": 2025,
+  "hits": 254
+ },
+ {
+  "name": "冰雪皇后",
+  "kind": "companies",
+  "ny": 6,
+  "span": 15,
+  "y0": 1997,
+  "y1": 2011,
+  "hits": 27
+ },
+ {
+  "name": "利捷航空",
+  "kind": "companies",
+  "ny": 17,
+  "span": 22,
+  "y0": 1998,
+  "y1": 2019,
+  "hits": 106
+ },
+ {
+  "name": "华盛顿邮报",
+  "kind": "companies",
+  "ny": 37,
+  "span": 45,
+  "y0": 1975,
+  "y1": 2019,
+  "hits": 130
+ },
+ {
+  "name": "卡夫亨氏",
+  "kind": "companies",
+  "ny": 8,
+  "span": 10,
+  "y0": 2015,
+  "y1": 2024,
+  "hits": 42
+ },
+ {
+  "name": "可口可乐",
+  "kind": "companies",
+  "ny": 40,
+  "span": 43,
+  "y0": 1983,
+  "y1": 2025,
+  "hits": 235
+ },
+ {
+  "name": "吉列",
+  "kind": "companies",
+  "ny": 19,
+  "span": 31,
+  "y0": 1989,
+  "y1": 2019,
+  "hits": 116
+ },
+ {
+  "name": "喜诗糖果",
+  "kind": "companies",
+  "ny": 38,
+  "span": 50,
+  "y0": 1973,
+  "y1": 2022,
+  "hits": 188
+ },
+ {
+  "name": "国民保险公司",
+  "kind": "companies",
+  "ny": 46,
+  "span": 59,
+  "y0": 1967,
+  "y1": 2025,
+  "hits": 133
+ },
+ {
+  "name": "大都会通信",
+  "kind": "companies",
+  "ny": 16,
+  "span": 39,
+  "y0": 1977,
+  "y1": 2015,
+  "hits": 28
+ },
+ {
+  "name": "威利家居",
+  "kind": "companies",
+  "ny": 8,
+  "span": 11,
+  "y0": 1995,
+  "y1": 2005,
+  "hits": 10
+ },
+ {
+  "name": "威瑞森通讯",
+  "kind": "companies",
+  "ny": 2,
+  "span": 2,
+  "y0": 2020,
+  "y1": 2021,
+  "hits": 3
+ },
+ {
+  "name": "富国银行",
+  "kind": "companies",
+  "ny": 30,
+  "span": 30,
+  "y0": 1990,
+  "y1": 2019,
+  "hits": 123
+ },
+ {
+  "name": "州立农业保险",
+  "kind": "companies",
+  "ny": 10,
+  "span": 30,
+  "y0": 1986,
+  "y1": 2015,
+  "hits": 34
+ },
+ {
+  "name": "布法罗新闻报",
+  "kind": "companies",
+  "ny": 21,
+  "span": 34,
+  "y0": 1982,
+  "y1": 2015,
+  "hits": 96
+ },
+ {
+  "name": "康菲石油",
+  "kind": "companies",
+  "ny": 7,
+  "span": 7,
+  "y0": 2006,
+  "y1": 2012,
+  "hits": 16
+ },
+ {
+  "name": "德克斯特鞋业",
+  "kind": "companies",
+  "ny": 13,
+  "span": 24,
+  "y0": 1993,
+  "y1": 2016,
+  "hits": 32
+ },
+ {
+  "name": "房地美",
+  "kind": "companies",
+  "ny": 16,
+  "span": 23,
+  "y0": 1988,
+  "y1": 2010,
+  "hits": 45
+ },
+ {
+  "name": "所罗门",
+  "kind": "companies",
+  "ny": 15,
+  "span": 36,
+  "y0": 1987,
+  "y1": 2022,
+  "hits": 101
+ },
+ {
+  "name": "斯科特费泽",
+  "kind": "companies",
+  "ny": 18,
+  "span": 18,
+  "y0": 1985,
+  "y1": 2002,
+  "hits": 139
+ },
+ {
+  "name": "森林河公司",
+  "kind": "companies",
+  "ny": 9,
+  "span": 20,
+  "y0": 2005,
+  "y1": 2024,
+  "hits": 22
+ },
+ {
+  "name": "比亚迪",
+  "kind": "companies",
+  "ny": 6,
+  "span": 14,
+  "y0": 2008,
+  "y1": 2021,
+  "hits": 14
+ },
+ {
+  "name": "波仙珠宝",
+  "kind": "companies",
+  "ny": 30,
+  "span": 30,
+  "y0": 1988,
+  "y1": 2017,
+  "hits": 153
+ },
+ {
+  "name": "特许通讯",
+  "kind": "companies",
+  "ny": 6,
+  "span": 6,
+  "y0": 2016,
+  "y1": 2021,
+  "hits": 11
+ },
+ {
+  "name": "盖可保险",
+  "kind": "companies",
+  "ny": 46,
+  "span": 49,
+  "y0": 1976,
+  "y1": 2024,
+  "hits": 1063
+ },
+ {
+  "name": "科比吸尘器",
+  "kind": "companies",
+  "ny": 7,
+  "span": 10,
+  "y0": 1985,
+  "y1": 1994,
+  "hits": 10
+ },
+ {
+  "name": "穆迪",
+  "kind": "companies",
+  "ny": 29,
+  "span": 64,
+  "y0": 1961,
+  "y1": 2024,
+  "hits": 61
+ },
+ {
+  "name": "精密铸件",
+  "kind": "companies",
+  "ny": 6,
+  "span": 6,
+  "y0": 2015,
+  "y1": 2020,
+  "hits": 22
+ },
+ {
+  "name": "约翰斯曼维尔",
+  "kind": "companies",
+  "ny": 15,
+  "span": 20,
+  "y0": 2000,
+  "y1": 2019,
+  "hits": 23
+ },
+ {
+  "name": "纽约梅隆银行",
+  "kind": "companies",
+  "ny": 5,
+  "span": 5,
+  "y0": 2017,
+  "y1": 2021,
+  "hits": 12
+ },
+ {
+  "name": "美国合众银行",
+  "kind": "companies",
+  "ny": 15,
+  "span": 16,
+  "y0": 2006,
+  "y1": 2021,
+  "hits": 25
+ },
+ {
+  "name": "美国家庭服务",
+  "kind": "companies",
+  "ny": 8,
+  "span": 8,
+  "y0": 2002,
+  "y1": 2009,
+  "hits": 17
+ },
+ {
+  "name": "美国运通",
+  "kind": "companies",
+  "ny": 36,
+  "span": 60,
+  "y0": 1965,
+  "y1": 2024,
+  "hits": 280
+ },
+ {
+  "name": "美国银行",
+  "kind": "companies",
+  "ny": 12,
+  "span": 57,
+  "y0": 1966,
+  "y1": 2022,
+  "hits": 37
+ },
+ {
+  "name": "苹果",
+  "kind": "companies",
+  "ny": 13,
+  "span": 61,
+  "y0": 1964,
+  "y1": 2024,
+  "hits": 51
+ },
+ {
+  "name": "蓝筹印花",
+  "kind": "companies",
+  "ny": 21,
+  "span": 52,
+  "y0": 1969,
+  "y1": 2020,
+  "hits": 198
+ },
+ {
+  "name": "西方石油",
+  "kind": "companies",
+  "ny": 6,
+  "span": 6,
+  "y0": 2019,
+  "y1": 2024,
+  "hits": 16
+ },
+ {
+  "name": "费希海默制服",
+  "kind": "companies",
+  "ny": 9,
+  "span": 22,
+  "y0": 1986,
+  "y1": 2007,
+  "hits": 15
+ },
+ {
+  "name": "路博润",
+  "kind": "companies",
+  "ny": 8,
+  "span": 9,
+  "y0": 2011,
+  "y1": 2019,
+  "hits": 29
+ },
+ {
+  "name": "通用再保险",
+  "kind": "companies",
+  "ny": 20,
+  "span": 32,
+  "y0": 1985,
+  "y1": 2016,
+  "hits": 227
+ },
+ {
+  "name": "通用汽车",
+  "kind": "companies",
+  "ny": 12,
+  "span": 61,
+  "y0": 1961,
+  "y1": 2021,
+  "hits": 25
+ },
+ {
+  "name": "通用电气",
+  "kind": "companies",
+  "ny": 46,
+  "span": 61,
+  "y0": 1964,
+  "y1": 2024,
+  "hits": 331
+ },
+ {
+  "name": "雪佛龙",
+  "kind": "companies",
+  "ny": 3,
+  "span": 3,
+  "y0": 2020,
+  "y1": 2022,
+  "hits": 6
+ },
+ {
+  "name": "韦斯科",
+  "kind": "companies",
+  "ny": 23,
+  "span": 47,
+  "y0": 1973,
+  "y1": 2019,
+  "hits": 92
+ },
+ {
+  "name": "飞安公司",
+  "kind": "companies",
+  "ny": 11,
+  "span": 12,
+  "y0": 1996,
+  "y1": 2007,
+  "hits": 31
+ },
+ {
+  "name": "马蒙集团",
+  "kind": "companies",
+  "ny": 14,
+  "span": 15,
+  "y0": 2007,
+  "y1": 2021,
+  "hits": 38
+ },
+ {
+  "name": "高盛",
+  "kind": "companies",
+  "ny": 13,
+  "span": 17,
+  "y0": 2003,
+  "y1": 2019,
+  "hits": 28
+ },
+ {
+  "name": "鲜果布衣",
+  "kind": "companies",
+  "ny": 6,
+  "span": 24,
+  "y0": 2001,
+  "y1": 2024,
+  "hits": 34
+ },
+ {
+  "name": "麦克莱恩",
+  "kind": "companies",
+  "ny": 6,
+  "span": 9,
+  "y0": 2003,
+  "y1": 2011,
+  "hits": 21
+ },
+ {
+  "name": "买入价格",
+  "kind": "concepts",
+  "ny": 18,
+  "span": 59,
+  "y0": 1963,
+  "y1": 2021,
+  "hits": 21
+ },
+ {
+  "name": "企业文化",
+  "kind": "concepts",
+  "ny": 15,
+  "span": 38,
+  "y0": 1982,
+  "y1": 2019,
+  "hits": 21
+ },
+ {
+  "name": "低估",
+  "kind": "concepts",
+  "ny": 46,
+  "span": 62,
+  "y0": 1957,
+  "y1": 2018,
+  "hits": 203
+ },
+ {
+  "name": "保险业",
+  "kind": "concepts",
+  "ny": 59,
+  "span": 65,
+  "y0": 1960,
+  "y1": 2024,
+  "hits": 596
+ },
+ {
+  "name": "保险浮存金",
+  "kind": "concepts",
+  "ny": 3,
+  "span": 13,
+  "y0": 1998,
+  "y1": 2010,
+  "hits": 3
+ },
+ {
+  "name": "债券",
+  "kind": "concepts",
+  "ny": 56,
+  "span": 69,
+  "y0": 1956,
+  "y1": 2024,
+  "hits": 827
+ },
+ {
+  "name": "公司治理",
+  "kind": "concepts",
+  "ny": 5,
+  "span": 39,
+  "y0": 1981,
+  "y1": 2019,
+  "hits": 9
+ },
+ {
+  "name": "内在价值",
+  "kind": "concepts",
+  "ny": 49,
+  "span": 66,
+  "y0": 1957,
+  "y1": 2022,
+  "hits": 325
+ },
+ {
+  "name": "分散投资",
+  "kind": "concepts",
+  "ny": 12,
+  "span": 54,
+  "y0": 1962,
+  "y1": 2015,
+  "hits": 23
+ },
+ {
+  "name": "可转换证券",
+  "kind": "concepts",
+  "ny": 3,
+  "span": 14,
+  "y0": 1982,
+  "y1": 1995,
+  "hits": 3
+ },
+ {
+  "name": "品牌",
+  "kind": "concepts",
+  "ny": 28,
+  "span": 59,
+  "y0": 1965,
+  "y1": 2023,
+  "hits": 66
+ },
+ {
+  "name": "商业模式",
+  "kind": "concepts",
+  "ny": 16,
+  "span": 37,
+  "y0": 1985,
+  "y1": 2021,
+  "hits": 28
+ },
+ {
+  "name": "商誉",
+  "kind": "concepts",
+  "ny": 30,
+  "span": 36,
+  "y0": 1981,
+  "y1": 2016,
+  "hits": 186
+ },
+ {
+  "name": "回购",
+  "kind": "concepts",
+  "ny": 40,
+  "span": 60,
+  "y0": 1965,
+  "y1": 2024,
+  "hits": 264
+ },
+ {
+  "name": "复利",
+  "kind": "concepts",
+  "ny": 28,
+  "span": 65,
+  "y0": 1960,
+  "y1": 2024,
+  "hits": 58
+ },
+ {
+  "name": "套利",
+  "kind": "concepts",
+  "ny": 22,
+  "span": 51,
+  "y0": 1957,
+  "y1": 2007,
+  "hits": 204
+ },
+ {
+  "name": "媒体与出版",
+  "kind": "concepts",
+  "ny": 0,
+  "span": 0,
+  "y0": 0,
+  "y1": 0,
+  "hits": 0
+ },
+ {
+  "name": "安全边际",
+  "kind": "concepts",
+  "ny": 7,
+  "span": 63,
+  "y0": 1961,
+  "y1": 2023,
+  "hits": 12
+ },
+ {
+  "name": "市场先生",
+  "kind": "concepts",
+  "ny": 2,
+  "span": 7,
+  "y0": 1987,
+  "y1": 1993,
+  "hits": 15
+ },
+ {
+  "name": "市场预测",
+  "kind": "concepts",
+  "ny": 4,
+  "span": 51,
+  "y0": 1966,
+  "y1": 2016,
+  "hits": 4
+ },
+ {
+  "name": "市盈率",
+  "kind": "concepts",
+  "ny": 19,
+  "span": 57,
+  "y0": 1961,
+  "y1": 2017,
+  "hits": 32
+ },
+ {
+  "name": "承保纪律",
+  "kind": "concepts",
+  "ny": 16,
+  "span": 44,
+  "y0": 1979,
+  "y1": 2022,
+  "hits": 22
+ },
+ {
+  "name": "护城河",
+  "kind": "concepts",
+  "ny": 13,
+  "span": 31,
+  "y0": 1986,
+  "y1": 2016,
+  "hits": 35
+ },
+ {
+  "name": "收购",
+  "kind": "concepts",
+  "ny": 63,
+  "span": 68,
+  "y0": 1957,
+  "y1": 2024,
+  "hits": 1230
+ },
+ {
+  "name": "有效市场",
+  "kind": "concepts",
+  "ny": 5,
+  "span": 24,
+  "y0": 1987,
+  "y1": 2010,
+  "hits": 10
+ },
+ {
+  "name": "杠杆",
+  "kind": "concepts",
+  "ny": 37,
+  "span": 62,
+  "y0": 1961,
+  "y1": 2022,
+  "hits": 91
+ },
+ {
+  "name": "特许经营权",
+  "kind": "concepts",
+  "ny": 10,
+  "span": 30,
+  "y0": 1979,
+  "y1": 2008,
+  "hits": 33
+ },
+ {
+  "name": "留存收益",
+  "kind": "concepts",
+  "ny": 36,
+  "span": 63,
+  "y0": 1960,
+  "y1": 2022,
+  "hits": 116
+ },
+ {
+  "name": "科技与互联网",
+  "kind": "concepts",
+  "ny": 0,
+  "span": 0,
+  "y0": 0,
+  "y1": 0,
+  "hits": 0
+ },
+ {
+  "name": "税收效率",
+  "kind": "concepts",
+  "ny": 1,
+  "span": 1,
+  "y0": 1983,
+  "y1": 1983,
+  "hits": 1
+ },
+ {
+  "name": "竞争优势",
+  "kind": "concepts",
+  "ny": 25,
+  "span": 55,
+  "y0": 1966,
+  "y1": 2020,
+  "hits": 62
+ },
+ {
+  "name": "管理层",
+  "kind": "concepts",
+  "ny": 65,
+  "span": 68,
+  "y0": 1958,
+  "y1": 2025,
+  "hits": 458
+ },
+ {
+  "name": "纺织业务",
+  "kind": "concepts",
+  "ny": 31,
+  "span": 57,
+  "y0": 1966,
+  "y1": 2022,
+  "hits": 92
+ },
+ {
+  "name": "股东导向",
+  "kind": "concepts",
+  "ny": 4,
+  "span": 15,
+  "y0": 2003,
+  "y1": 2017,
+  "hits": 4
+ },
+ {
+  "name": "股息",
+  "kind": "concepts",
+  "ny": 51,
+  "span": 68,
+  "y0": 1957,
+  "y1": 2024,
+  "hits": 257
+ },
+ {
+  "name": "能力圈",
+  "kind": "concepts",
+  "ny": 6,
+  "span": 30,
+  "y0": 1984,
+  "y1": 2013,
+  "hits": 11
+ },
+ {
+  "name": "能源",
+  "kind": "concepts",
+  "ny": 28,
+  "span": 53,
+  "y0": 1973,
+  "y1": 2025,
+  "hits": 236
+ },
+ {
+  "name": "航空业",
+  "kind": "concepts",
+  "ny": 9,
+  "span": 21,
+  "y0": 1989,
+  "y1": 2009,
+  "hits": 16
+ },
+ {
+  "name": "衍生品",
+  "kind": "concepts",
+  "ny": 14,
+  "span": 18,
+  "y0": 1997,
+  "y1": 2014,
+  "hits": 136
+ },
+ {
+  "name": "诚信",
+  "kind": "concepts",
+  "ny": 8,
+  "span": 43,
+  "y0": 1979,
+  "y1": 2021,
+  "hits": 9
+ },
+ {
+  "name": "账面价值",
+  "kind": "concepts",
+  "ny": 55,
+  "span": 63,
+  "y0": 1961,
+  "y1": 2023,
+  "hits": 420
+ },
+ {
+  "name": "资本配置",
+  "kind": "concepts",
+  "ny": 33,
+  "span": 45,
+  "y0": 1980,
+  "y1": 2024,
+  "hits": 77
+ },
+ {
+  "name": "透视盈余",
+  "kind": "concepts",
+  "ny": 0,
+  "span": 0,
+  "y0": 0,
+  "y1": 0,
+  "hits": 0
+ },
+ {
+  "name": "通货膨胀",
+  "kind": "concepts",
+  "ny": 22,
+  "span": 64,
+  "y0": 1961,
+  "y1": 2024,
+  "hits": 39
+ },
+ {
+  "name": "铁路运输",
+  "kind": "concepts",
+  "ny": 3,
+  "span": 6,
+  "y0": 2015,
+  "y1": 2020,
+  "hits": 4
+ },
+ {
+  "name": "银行业",
+  "kind": "concepts",
+  "ny": 19,
+  "span": 47,
+  "y0": 1969,
+  "y1": 2015,
+  "hits": 32
+ },
+ {
+  "name": "长期持有",
+  "kind": "concepts",
+  "ny": 18,
+  "span": 62,
+  "y0": 1963,
+  "y1": 2024,
+  "hits": 20
+ },
+ {
+  "name": "集中投资",
+  "kind": "concepts",
+  "ny": 5,
+  "span": 39,
+  "y0": 1965,
+  "y1": 2003,
+  "hits": 8
+ },
+ {
+  "name": "零售与消费",
+  "kind": "concepts",
+  "ny": 0,
+  "span": 0,
+  "y0": 0,
+  "y1": 0,
+  "hits": 0
+ },
+ {
+  "name": "B夫人",
+  "kind": "people",
+  "ny": 16,
+  "span": 38,
+  "y0": 1983,
+  "y1": 2020,
+  "hits": 92
+ },
+ {
+  "name": "托德·库姆斯",
+  "kind": "people",
+  "ny": 10,
+  "span": 15,
+  "y0": 2010,
+  "y1": 2024,
+  "hits": 26
+ },
+ {
+  "name": "格雷厄姆",
+  "kind": "people",
+  "ny": 27,
+  "span": 60,
+  "y0": 1966,
+  "y1": 2025,
+  "hits": 109
+ },
+ {
+  "name": "格雷格·阿贝尔",
+  "kind": "people",
+  "ny": 21,
+  "span": 24,
+  "y0": 2002,
+  "y1": 2025,
+  "hits": 52
+ },
+ {
+  "name": "泰德·韦施勒",
+  "kind": "people",
+  "ny": 8,
+  "span": 11,
+  "y0": 2011,
+  "y1": 2021,
+  "hits": 22
+ },
+ {
+  "name": "芒格",
+  "kind": "people",
+  "ny": 47,
+  "span": 57,
+  "y0": 1969,
+  "y1": 2025,
+  "hits": 991
+ },
+ {
+  "name": "阿吉特·贾恩",
+  "kind": "people",
+  "ny": 36,
+  "span": 38,
+  "y0": 1988,
+  "y1": 2025,
+  "hits": 133
+ }
+]
