@@ -29,6 +29,10 @@ index.pre-redesign.html
 Thumbs.db
 node_modules/
 
+# 应用发布产生的标记文件（.wbapp_*.genie、.workbuddy/applications.yaml）
+.wbapp_*.genie
+.workbuddy/applications.yaml
+
 # 语料来源是第三方仓库 https://github.com/Sphinm/buffett-letters.git 的克隆（自带 .git）。
 # 它不进本仓库，README 里注明出处与 commit；站点所需数据已由 build.py 生成进 site/data-*.js。
 _src/
