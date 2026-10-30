@@ -137,8 +137,11 @@ async function clickAt(p, s) {
     const s = document.querySelector('.tp-state');
     return { text: s ? s.innerText.trim() : null, cls: s ? s.className : null };
   `, sessionId);
+  /* 在线的状态文案有两种，都算如实标注：本机老版本「已连接本地 Agent」，
+     带免费额度的版本「已连接 · 免费体验剩 N 次」 */
   const wantState = online ? '已连接本地 Agent' : '离线模式（关键词检索）';
-  rec(st1.text === wantState, '连接状态如实标注', JSON.stringify(st1.text) + '（期望：' + wantState + '）');
+  rec(st1.text === wantState || (online && /^已连接 · 免费体验剩 \d+ 次$/.test(st1.text)),
+    '连接状态如实标注', JSON.stringify(st1.text) + '（期望：' + wantState + ' 或免费次数）');
 
   /* 3. 提问完整链路：输入 → 出答案 */
   const tin = await geo('#talk-in', 0, sessionId);

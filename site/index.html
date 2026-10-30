@@ -1997,11 +1997,18 @@ function fmtSrcs(list){
 
 /* 本地服务的地址：页面如果就是它自己托管的，用相对路径；
    双击 html（file://）打开的，就直奔 127.0.0.1:8099。 */
-var TM = { online: null, base: '', mode: 'builtin', model: 'flash', web: true, ctrl: null, probing: false };
+var TM = { online: null, base: '', mode: 'builtin', model: 'flash', web: true, ctrl: null, probing: false, free: null };
 /* 访问者自带密钥：公网实例上服务端没有密钥，谁用谁填自己的，只存在这台浏览器里。
    本机实例服务端自带密钥，这个值是空的，也不会被发出去。 */
 var TKEY = '';
 try { TKEY = localStorage.getItem('BUFFETT_DS_KEY') || ''; } catch (e) { TKEY = ''; }
+/* 访客号：服务端靠它记免费额度（每人 10 问）。存在本地存储里，清了缓存就是新访客，
+   但服务端还有全站每日上限兜底，刷不出第二份免费午餐。 */
+var TVID = '';
+try {
+  TVID = localStorage.getItem('BUFFETT_VID') || '';
+  if (!TVID){ TVID = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); localStorage.setItem('BUFFETT_VID', TVID); }
+} catch (e) { TVID = 'vanon'; }
 function talkBase(){
   if (TM.base) return TM.base;
   TM.base = (location.protocol === 'http:' || location.protocol === 'https:') ? '' : 'http://127.0.0.1:8099';
@@ -2019,12 +2026,14 @@ function talkProbe(){
       return Promise.resolve(false);
     }
     var b = tries[n++];
-    return fetch(b + '/api/health', { cache: 'no-store' }).then(function(r){ return r.json(); })
+    return fetch(b + '/api/health?vid=' + encodeURIComponent(TVID), { cache: 'no-store' }).then(function(r){ return r.json(); })
       .then(function(j){
-        /* 服务端自带密钥（本机）是 builtin；公网实例没有密钥，是 byo（访问者自带），
-           两种都算「服务活着」，只是第二种要先填密钥才能问。 */
+        /* 服务端自带密钥（本机/线上带额度的实例）是 builtin；公网实例没有密钥，是 byo（访问者自带），
+           两种都算「服务活着」。builtin 会附带 freeLeft（还剩几次免费）。 */
         if (j && j.ok && (j.key || j.keyMode === 'byo')){
           TM.base = b; TM.online = true; TM.mode = j.keyMode || 'builtin';
+          TM.free = (typeof j.freeLeft === 'number') ? j.freeLeft : null;
+          TM.total = (typeof j.freeTotal === 'number') ? j.freeTotal : 10;
           if (route() === '/talk') talkUpdateState();
           return true;
         }
@@ -2045,8 +2054,10 @@ function talkProbe(){
 function talkStateText(){
   if (TM.online === null) return '正在探活…';
   if (TM.online !== true) return '离线模式（关键词检索）';
-  return TM.mode === 'byo' ? (TKEY ? '已就绪 · 用你自己的密钥' : '待填密钥')
-    : '已连接本地 Agent';
+  if (TM.mode === 'byo') return TKEY ? '已就绪 · 用你自己的密钥' : '待填密钥';
+  if (TM.free === 0) return '免费额度已用完 · 填密钥继续';
+  if (TM.free != null) return '已连接 · 免费体验剩 ' + TM.free + ' 次';
+  return '已连接本地 Agent';
 }
 function talkHeroP(){
   if (TM.online === null) return '正在连本地 Agent 服务…';
@@ -2054,8 +2065,12 @@ function talkHeroP(){
   if (TM.mode === 'byo') return '这是个会自己去查资料的 agent：他会在 98 封信里翻找，必要时上网核实，' +
     '每句话都标出来处。<br>这个站点没有内置密钥，请先在下面填你自己的 DeepSeek 密钥' +
     '（只存在你自己浏览器里，随请求发给本机服务，不落盘）。';
+  if (TM.free === 0) return '这是会自己查资料的 agent：在 98 封信里翻找，必要时上网核实，每句话都标出来处。<br>' +
+    '你的 ' + (TM.total || 10) + ' 次免费体验用完了——在下面填上你自己的 DeepSeek 密钥就能继续问' +
+    '（只存这台浏览器），或者明天再来看看。';
   return '这是个会自己去查资料的 agent：他会在 98 封信里翻找，必要时上网核实，' +
-    '每句话都标出来处。不知道问什么？试试这些话题';
+    '每句话都标出来处。<b>前 ' + (TM.total || 10) + ' 次提问免费</b>，不需要任何密钥' +
+    (TM.free != null ? '（你还剩 ' + TM.free + ' 次）' : '') + '。不知道问什么？试试这些话题';
 }
 function talkUpdateState(){
   var s = document.querySelector('.tp-state');
@@ -2070,6 +2085,8 @@ function talkUpdateState(){
 function talkPage(){
   var online = TM.online === true;
   var byo = online && TM.mode === 'byo';
+  /* 密钥控件出现的两种情形：公网实例本来就要访客填；或者免费额度用完了要继续问 */
+  var showKey = byo || (online && TM.free === 0);
   var body = TALK.msgs.length ? talkMsgs()
     : '<div class="tp-hero"><div class="tp-cup">' + cupSVG(46) + '</div>' +
       '<p>' + talkHeroP() + '</p><div class="tp-topics">' + talkTopics() + '</div></div>';
@@ -2090,15 +2107,17 @@ function talkPage(){
       '<div class="tp-opts">' +
         '<label><input type="checkbox" id="talk-web"' + (TM.web ? ' checked' : '') + '> 允许联网核实（信件之外的事才用）</label>' +
         '<label><input type="checkbox" id="talk-pro"' + (TM.model === 'pro' ? ' checked' : '') + '> 深思模式（更慢、更细）</label>' +
-        (byo ? '<button class="tp-keybtn" id="talk-keybtn">' + (TKEY ? '已填密钥 · 更换' : '填我的 DeepSeek 密钥') + '</button>' : '') +
+        (showKey ? '<button class="tp-keybtn" id="talk-keybtn">' + (TKEY ? '已填密钥 · 更换' : '填我的 DeepSeek 密钥') + '</button>' : '') +
         '<button class="tp-stop" id="talk-stop" style="display:none">停止</button>' +
       '</div>' +
-      /* 公网实例没有内置密钥，谁用谁填自己的：只存在这台浏览器，随请求发给服务端，服务端不落盘 */
-      (byo ? '<div class="tp-keyrow" id="talk-keyrow" style="display:none">' +
+      /* 公网实例没有内置密钥，谁用谁填自己的；免费额度用完也一样 —— 只存在这台浏览器，随请求发给服务端，服务端不落盘 */
+      (showKey ? '<div class="tp-keyrow" id="talk-keyrow" style="display:none">' +
         '<input id="talk-keyin" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" value="' + esc(TKEY) + '">' +
         '<button class="tp-keysave" id="talk-keysave">保存</button>' +
         '<button class="tp-keyclr" id="talk-keyclr">清除</button>' +
-        '<span class="tp-keyhint">密钥存在这台浏览器的本地存储里，只发给这个站点的服务端，不写入服务器磁盘。</span>' +
+        '<span class="tp-keyhint">' + (byo
+          ? '密钥存在这台浏览器的本地存储里，只发给这个站点的服务端，不写入服务器磁盘。'
+          : '免费的 10 次用完了。填上你自己的 DeepSeek 密钥（sk- 开头）就能继续问，只存这台浏览器、不写入服务器磁盘。') + '</span>' +
       '</div>' : '') +
     '</div>' +
     '<p class="tp-note">回答基于巴菲特公开信件整理，不构成任何投资建议。' +
@@ -2128,10 +2147,20 @@ function talkAsk(q){
     talkLocalFallback(q, idx);
     return;
   }
-  /* 公网实例上服务端没有密钥，必须由访问者提供，否则这一问只会换来一条报错 */
+  /* 两种要先填密钥的情形，当场拦下，免得白跑一趟服务端：
+     公网实例本来就要访客填；免费额度用完了也得填。 */
   if (TM.mode === 'byo' && !TKEY){
     TALK.msgs[idx] = { r: 'b', h: '<p>这个站点没有内置密钥，请先点下面的「填我的 DeepSeek 密钥」，' +
       '把你自己的密钥粘进来（只存在你这台浏览器里）。</p>' +
+      '<p>没有密钥也可以到 <a href="https://platform.deepseek.com">platform.deepseek.com</a> 申请，' +
+      '新账号有免费额度。</p>' };
+    TALK.busy = false;
+    if (route() === '/talk'){ render(); talkScroll(); }
+    return;
+  }
+  if (TM.mode === 'builtin' && TM.free === 0 && !TKEY){
+    TALK.msgs[idx] = { r: 'b', h: '<p>你的 ' + (TM.total || 10) + ' 次免费体验用完了。' +
+      '点下面的「填我的 DeepSeek 密钥」，填上你自己的密钥就能继续问（只存在这台浏览器里）。</p>' +
       '<p>没有密钥也可以到 <a href="https://platform.deepseek.com">platform.deepseek.com</a> 申请，' +
       '新账号有免费额度。</p>' };
     TALK.busy = false;
@@ -2197,7 +2226,7 @@ function talkStream(q, idx){
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: q, session: TALK.session, web: TM.web, model: TM.model,
-      key: TM.mode === 'byo' ? TKEY : '' }),
+      vid: TVID, key: TKEY }),
     signal: TM.ctrl ? TM.ctrl.signal : undefined
   }).then(function(res){
     if (!res.ok) throw new Error('本地服务返回 ' + res.status);
@@ -2239,8 +2268,12 @@ function talkEvent(ev, d, idx){
   else if (ev === 'delta'){ m.raw += d.text; talkPaint(idx); }
   else if (ev === 'reset'){ m.raw = ''; talkPaint(idx); }   // 这一轮它改主意去查工具了，刚才那半句不算答案
   else if (ev === 'sources'){ m.sources = d.sources || []; talkPaint(idx); }
+  else if (ev === 'quota'){ TM.free = d.left; if (d.total) TM.total = d.total; talkUpdateState(); }
   else if (ev === 'note'){ m.note = d.text; }
-  else if (ev === 'error'){ talkFinish(idx, d.message); }
+  else if (ev === 'error'){
+    if (d.needKey){ TM.free = 0; talkUpdateState(); }   // 服务端说额度用完了，听它的
+    talkFinish(idx, d.message);
+  }
   else if (ev === 'usage'){ m.usage = d; }
   else if (ev === 'done'){
     m.rounds = d.rounds; m.calls = d.calls;
@@ -2262,7 +2295,16 @@ function talkFinish(idx, err){
   TALK.busy = false;
   var stop = document.getElementById('talk-stop');
   if (stop) stop.style.display = 'none';
-  if (route() === '/talk'){ talkPaint(idx); }
+  if (route() === '/talk'){
+    /* 这一问之后免费额度见底了，而密钥控件还没画出来 —— 补一次整页重绘让它出现。
+       不能在流式过程中做（会撕掉正在打字的气泡），所以放在收尾这里。 */
+    if (TM.online === true && TM.free === 0 && !document.getElementById('talk-keyrow')){
+      render();
+    } else {
+      talkPaint(idx);
+    }
+    talkScroll();
+  }
 }
 
 /* ---------- 路由 ---------- */

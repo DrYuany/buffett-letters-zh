@@ -24,10 +24,18 @@ const PORT = Number(process.env.PORT || 8099);
 /* 部署环境一定会注入 PORT。本机双击 start.bat 时不设，于是只听 127.0.0.1。 */
 const DEPLOY = !!process.env.PORT;
 /* 密钥可以在两个地方：项目里的 _agent.key（本机），或者用户目录下的 ~/.buffett-agent.key。
-   推荐放用户目录 —— 项目目录要打包、要发布，多一个千载难逢的泄密口就多一分风险。 */
+   公网部署走前者：文件不进 git（.gitignore 拦着），但会随目录一起发布到线上，
+   这样访客才能享受免费额度。 */
 const KEY_FILES = [path.join(ROOT, '_agent.key'), path.join(os.homedir(), '.buffett-agent.key')];
 const KEY_FILE = KEY_FILES[0];
 const MEM_FILE = path.join(ROOT, 'agent-memory.json');
+/* 免费额度：每位访客用站长的密钥免费问 10 次，用完再填自己的密钥。
+   配额记在服务端 agent-quota.json 里（不进 git），清浏览器存储也刷不掉。
+   另设一道全站每日上限：万一有人写脚本批量领额度，最多烧掉 FREE_DAY_MAX 问，
+   之后当天只接受访客自带密钥。 */
+const QUOTA_FILE = path.join(ROOT, 'agent-quota.json');
+const FREE_PER_VISITOR = 10;
+const FREE_DAY_MAX = 150;
 const DEEPSEEK = 'https://api.deepseek.com/chat/completions';
 const MAX_ROUNDS = 6;
 const MAX_TOOLCALLS = 14;
@@ -157,6 +165,57 @@ function nowStamp() {
 async function readMemory() {
   try { return JSON.parse(await fsp.readFile(MEM_FILE, 'utf8')) || { notes: [] }; }
   catch (e) { return { notes: [] }; }
+}
+
+/* ---------------- 免费额度 ----------------
+   文件长这样：{ visitors: { vid: { used, ip, first, last } }, days: { '2026-10-30': 57 } }
+   全部落盘 —— 重启服务不清零，访客清浏览器缓存也没用（额度跟着 vid 走，vid 丢了
+   顶多算新访客再领 10 次，但全站每日上限兜底）。 */
+let _quotaSave = Promise.resolve();
+async function readQuota() {
+  try { return JSON.parse(await fsp.readFile(QUOTA_FILE, 'utf8')) || { visitors: {}, days: {} }; }
+  catch (e) { return { visitors: {}, days: {} }; }
+}
+function saveQuota(q) {
+  /* 串行写入：两个问题同时在跑时不能互相把对方的计数覆盖掉 */
+  _quotaSave = _quotaSave.then(() => fsp.writeFile(QUOTA_FILE, JSON.stringify(q), 'utf8')).catch(() => {});
+  return _quotaSave;
+}
+/* 访客还能免费问几问。vid 是前端生成、存在浏览器里的随机串；
+   没带来的就按 IP 算。今天全站免费额度烧穿 FREE_DAY_MAX 时，对所有人都按 0 算。 */
+async function freeLeft(vid) {
+  const q = await readQuota();
+  const today = nowStamp().slice(0, 10);
+  if ((q.days[today] || 0) >= FREE_DAY_MAX) return 0;
+  const v = q.visitors[vid];
+  return Math.max(0, FREE_PER_VISITOR - ((v && v.used) || 0));
+}
+async function consumeFree(vid, ip) {
+  const q = await readQuota();
+  const today = nowStamp().slice(0, 10);
+  const v = q.visitors[vid] || (q.visitors[vid] = { used: 0, ip: '', first: '', last: '' });
+  v.used++; v.ip = ip; v.last = nowStamp();
+  if (!v.first) v.first = v.last;
+  q.days[today] = (q.days[today] || 0) + 1;
+  /* 名册只留最近 5000 个访客，防止文件无限膨胀 */
+  const ids = Object.keys(q.visitors);
+  if (ids.length > 5000) {
+    ids.sort((a, b) => String(q.visitors[a].last).localeCompare(String(q.visitors[b].last)));
+    for (let i = 0; i < ids.length - 5000; i++) delete q.visitors[ids[i]];
+  }
+  for (const d in q.days) if (d < today) delete q.days[d];
+  await saveQuota(q);
+  return Math.max(0, FREE_PER_VISITOR - v.used);
+}
+/* 问失败不扣额度：钱是站长的，但账要讲理 */
+async function refundFree(vid) {
+  const q = await readQuota();
+  const v = q.visitors[vid];
+  if (!v || v.used <= 0) return;
+  v.used--;
+  const today = nowStamp().slice(0, 10);
+  if (q.days[today]) q.days[today] = Math.max(0, q.days[today] - 1);
+  await saveQuota(q);
 }
 
 /* ---------------- 工具 ---------------- */
@@ -560,9 +619,10 @@ function getSession(id) {
 
 async function runAgent(ctx) {
   const { message, session, model, web, emit, key } = ctx;
-  const apiKey = await getKey(key);
+  /* 密钥由 emitSSE 按免费额度规则选好再传进来；这里只管报「确实没有」的情况 */
+  const apiKey = key;
   if (!apiKey) throw new Error('这台机器上没有配置 DeepSeek 密钥。本机用就写进 ' +
-    KEY_FILES.join(' 或 ') + '；公网实例请在页面上填你自己的密钥。');
+    KEY_FILES.join(' 或 ') + '；公网访客请在页面上填自己的密钥。');
 
   const mem = await readMemory();
   const tools = web ? TOOLS : TOOLS.filter(t => t.function.name !== 'web_search' && t.function.name !== 'open_url');
@@ -663,16 +723,11 @@ async function serverKey() {
   return null;
 }
 /* 没有自带密钥时（比如发布到公网的实例），允许访问者带自己的密钥来用。
-   自带密钥存在时一律忽略访问者的 —— 否则别人能蹭主机的额度。
-   顺手做一次格式检查，免得把乱七八糟的字符串当密钥转发给上游。 */
+   密钥选用规则（决定权在 emitSSE，这里只做格式检查，免得把乱七八糟的字符串转发给上游）：
+   1. 访客还有免费额度 → 用站长的密钥（访客免费，站长买单）；
+   2. 免费额度用完且访客填了自己的密钥 → 用访客的；
+   3. 两者都没有 → 拒答，提示填密钥。 */
 function looksLikeKey(s) { return /^sk-[A-Za-z0-9\-_]{16,}$/.test(String(s || '').trim()); }
-async function getKey(byo) {
-  const own = await serverKey();
-  if (own) return own;
-  if (byo && looksLikeKey(byo)) return String(byo).trim();
-  return null;
-}
-function keyMode() { return _keyCache || process.env.DEEPSEEK_API_KEY ? 'builtin' : 'byo'; }
 
 /* ---------------- HTTP ---------------- */
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -693,13 +748,19 @@ const server = http.createServer(async (req, res) => {
       for await (const c of req) { body += c; if (body.length > 200000) break; }
       let q = {};
       try { q = JSON.parse(body || '{}'); } catch (e) { q = {}; }
-      return emitSSE(res, q);
+      return emitSSE(res, q, req.socket.remoteAddress || '');
     }
     if (u.pathname === '/api/health') {
       const own = await serverKey();
-      /* keyMode: builtin=服务端自带密钥（本机）；byo=没有，访问者要填自己的（公网实例） */
-      return json(res, 200, { ok: true, key: !!own, keyMode: own ? 'builtin' : 'byo',
-        docs: DOCS.length, letters: C.meta.letters, models: ['deepseek-v4-pro', 'deepseek-flash'] });
+      /* keyMode: builtin=服务端自带密钥（免费额度随它发放）；byo=没有，访问者要填自己的 */
+      const out = { ok: true, key: !!own, keyMode: own ? 'builtin' : 'byo',
+        docs: DOCS.length, letters: C.meta.letters, models: ['deepseek-v4-pro', 'deepseek-flash'] };
+      if (own) {
+        const vid = String(u.searchParams.get('vid') || '').slice(0, 64) || ('ip:' + (req.socket.remoteAddress || '?'));
+        out.freeLeft = await freeLeft(vid);
+        out.freeTotal = FREE_PER_VISITOR;
+      }
+      return json(res, 200, out);
     }
     if (u.pathname === '/api/memory') {
       if (req.method === 'DELETE') { await fsp.writeFile(MEM_FILE, JSON.stringify({ notes: [] }, null, 1), 'utf8'); return json(res, 200, { ok: true }); }
@@ -723,7 +784,7 @@ function json(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
-function emitSSE(res, q) {
+function emitSSE(res, q, ip) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -731,19 +792,49 @@ function emitSSE(res, q) {
   });
   const emit = (type, data) => { res.write('event: ' + type + '\ndata: ' + JSON.stringify(data) + '\n\n'); };
   (async () => {
+    /* 这两个要活在 try 外面：catch 里退款时还用得上 */
+    let vid = '', usedFree = false;
     try {
       emit('start', { model: q.model === 'pro' ? 'deepseek-v4-pro' : 'deepseek-flash' });
+      /* ---- 选密钥 ----
+         vid 是前端存在浏览器里的随机访客号；没带来就按 IP 记账。 */
+      vid = String(q.vid || '').slice(0, 64) || ('ip:' + (ip || '?'));
+      const byo = looksLikeKey(q.key) ? String(q.key).trim() : '';
+      const own = await serverKey();
+      let apiKey = null, keySource = 'none';
+      if (own && (await freeLeft(vid)) > 0) {
+        /* 还在免费额度内：哪怕访客填了自己的密钥也先用站长的（额度不用白不用，
+           访客的密钥留给额度用完之后） */
+        apiKey = own; keySource = 'free'; usedFree = true;
+      } else if (byo) {
+        apiKey = byo; keySource = 'byo';
+      } else if (own) {
+        emit('error', { message: '免费体验的 ' + FREE_PER_VISITOR + ' 次用完了。在下面填上你自己的 DeepSeek 密钥就能继续问' +
+          '（存在你这台浏览器里，只发给本站服务端），或者明天再来。', needKey: true });
+        return res.end();
+      } else {
+        emit('error', { message: '这个站点没有配置 DeepSeek 密钥，请在下面填你自己的密钥（sk- 开头，只存在你这台浏览器里）。', needKey: true });
+        return res.end();
+      }
+      if (usedFree) {
+        const left = await consumeFree(vid, ip);
+        emit('quota', { left: left, total: FREE_PER_VISITOR, keySource: 'free' });
+      } else {
+        emit('quota', { left: 0, total: FREE_PER_VISITOR, keySource: 'byo' });
+      }
       const info = await runAgent({
         message: String(q.message || '').slice(0, 2000),
         session: String(q.session || 'default').slice(0, 40),
         /* 默认走快的那个：坐着聊天等 40 秒太长。想要更细的推理再选 pro。 */
         model: q.model === 'pro' ? 'deepseek-v4-pro' : 'deepseek-flash',
         web: q.web !== false,
-        key: String(q.key || '').slice(0, 120),
+        key: apiKey,
         emit: emit
       });
       emit('done', info);
     } catch (e) {
+      /* 这一问没成，免费额度退回去 —— 不能让人白花一次 */
+      if (usedFree) await refundFree(vid);
       emit('error', { message: e.message });
     } finally {
       res.end();
@@ -761,6 +852,6 @@ server.listen(PORT, DEPLOY ? '0.0.0.0' : '127.0.0.1', async () => {
   console.log('「巴菲特午餐会」Agent 已就绪');
   console.log('  打开： http://' + (DEPLOY ? '<线上域名>' : '127.0.0.1:' + PORT) + '/index.html#/talk');
   console.log('  语料： ' + DOCS.length + ' 段 / ' + C.meta.letters + ' 封信 / ' + Math.round(C.meta.chars / 10000) + ' 万字');
-  console.log('  密钥： ' + (hasKey ? '本机已配置' : '未配置 —— 访问者需在页面上填自己的密钥'));
+  console.log('  密钥： ' + (hasKey ? '已配置 —— 每位访客免费 ' + FREE_PER_VISITOR + ' 问，之后用访客自己的密钥' : '未配置 —— 访问者需在页面上填自己的密钥'));
   console.log('');
 });

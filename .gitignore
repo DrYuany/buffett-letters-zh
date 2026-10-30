@@ -6,6 +6,9 @@ _agent.key
 # agent 的长期记忆是本机的读者笔记，含个人偏好，不入库
 agent-memory.json
 
+# 免费额度账本（谁问过几问），本机/线上各自记账，不入库
+agent-quota.json
+
 # 审计 / 排查的过程产物
 _agent.log
 _audit*.log
