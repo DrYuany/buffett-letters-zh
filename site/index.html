@@ -505,7 +505,7 @@ a.noyr{text-decoration:none;pointer-events:none}
 .tp-topic span{font-size:14px;color:var(--text)}
 /* scroll-margin-bottom 要盖住粘在底部那一整条（输入框 + 开关），
    否则"滚到最后一条"会被它压住一截。 */
-.msg{display:flex;gap:10px;margin:0 0 20px;align-items:flex-start;scroll-margin-bottom:150px}
+.msg{display:flex;gap:10px;margin:0 0 20px;align-items:flex-start;scroll-margin-bottom:220px}
 .msg.u{justify-content:flex-end}
 .msg .bubble{max-width:80%;padding:12px 16px;border-radius:14px;font-size:14.5px;line-height:1.85}
 .msg.u .bubble{background:var(--gold);color:#fff;border-bottom-right-radius:4px;white-space:pre-wrap}
@@ -587,6 +587,33 @@ a.noyr{text-decoration:none;pointer-events:none}
 .tp-mem button{background:none;border:0;color:var(--gold);cursor:pointer;font-size:11.5px;
   text-decoration:underline;padding:0;font-family:var(--sans)}
 .tp-note{font-size:11.5px;color:var(--ink3);text-align:center;margin:10px 0 0}
+
+/* ===== 分身模式：模式切换 / 事件卡 / 双区答案 ===== */
+.tp-modes{display:inline-flex;gap:3px;align-items:center;border:1px solid var(--line2);
+  border-radius:8px;padding:2px;background:var(--bg2)}
+.tp-mode-btn{border:0;background:transparent;color:var(--ink3);font-size:11.8px;padding:4px 10px;
+  border-radius:6px;cursor:pointer;font-family:var(--sans);white-space:nowrap}
+.tp-mode-btn.on{background:var(--gold);color:#fff;font-weight:600}
+.tp-mode-btn:hover:not(.on){color:var(--gold)}
+.tp-event{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 8px;
+  padding:10px 12px;border:1px solid var(--line2);border-radius:9px;background:var(--bg2)}
+.tp-event.off{opacity:.55}
+.tp-event-h{grid-column:1/-1;font-size:11.5px;color:var(--ink3);line-height:1.6}
+.tp-event-h b{color:var(--gold);font-weight:600}
+.tp-event input{min-width:0;width:100%;box-sizing:border-box;border:1px solid var(--line2);
+  border-radius:7px;padding:8px 10px;font-size:12.5px;font-family:var(--sans);
+  background:var(--panel);color:var(--text);outline:none}
+.tp-event input:focus{border-color:var(--gold)}
+.tp-zone{border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin:10px 0;background:var(--bg2)}
+.tp-zone-h{font-size:11.5px;font-weight:600;color:var(--ink2);margin-bottom:8px;letter-spacing:.3px}
+.tp-zone-sim{border-style:dashed;border-left:3px solid #BA7517;background:var(--panel)}
+.tp-zone-sim .tp-zone-h{color:#8A5A1A}
+.tp-case{display:inline-block;font-size:11px;color:#8A5A1A;background:#FDF3E3;
+  border:1px solid #F0DCB4;border-radius:5px;padding:0 5px;margin:0 2px;white-space:nowrap}
+@media(max-width:520px){
+  .tp-event{grid-template-columns:1fr}
+  .tp-opts{gap:9px}
+}
 
 /* ===== 响应式 ===== */
 @media(max-width:1180px){
@@ -1667,7 +1694,7 @@ function rules(){
    连同年份和段落号贴回来，每条都能点回原信。
    这个体量（130 万字、8 千段）不需要向量库：字面检索就够快，
    也没有 embedding 的构建、存储和调用成本；真接大模型时再把这里的 top-k 当上下文即可。 */
-var TALK = { msgs: [], draft: '', lastEnt: '', lastQ: '', asked: '', busy: false, seen: {},
+var TALK = { msgs: [], draft: '', evFact: '', evGuess: '', lastEnt: '', lastQ: '', asked: '', busy: false, seen: {},
   session: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
 
 /* 线描茶杯：不依赖 emoji 字体，深浅背景下都能看清 */
@@ -1933,7 +1960,7 @@ function talkMsgs(){
     var body;
     if (m.live && !m.raw && !m.h) body = '<p class="ttyping">正在想一想该从哪儿翻起…</p>';
     else if (m.h) body = m.h;
-    else body = fmtAns(m.raw || '') + (m.live ? '<span class="tp-caret"></span>' : '');
+    else body = fmtBody(m) + (m.live ? '<span class="tp-caret"></span>' : '');
     return '<div class="msg b" id="tm-' + i + '"><div class="ava">' + cupSVG(16) + '</div>' +
       '<div class="bubble">' + steps + body + fmtSrcs(m.sources || []) + fmtMeta(m) + '</div></div>';
   }).join('');
@@ -1948,7 +1975,7 @@ function fmtCite(s){
     var y = (a.match(/\d{4}/) || [''])[0];
     return '<a class="ct-cite" href="#/l/' + encodeURIComponent(a) + '?b=' + encodeURIComponent(b) + '">' +
       y + ' 年 · 读原文 ↗</a>';
-  });
+  }).replace(/〔([A-Za-z0-9\u4e00-\u9fa5\-_]+)〕/g, '<span class="tp-case">$1</span>');
 }
 function fmtAns(t){
   var out = '', quote = false;
@@ -1973,6 +2000,21 @@ function fmtAns(t){
   if (quote) out += '</blockquote>';
   return out;
 }
+/* 分身答案按两个固定标题切成两区：原话能点回原信，推演明确标成模拟。
+   模型偶尔不按格式写就原样显示，别让读者看到半截 HTML。 */
+var SIM_H1 = '【他确实说过】', SIM_H2 = '【按这些依据推演】';
+function fmtSim(t){
+  var s0 = String(t || '');
+  var a = s0.indexOf(SIM_H1), b = s0.indexOf(SIM_H2);
+  if (a < 0 || b < 0 || b < a) return fmtAns(s0);
+  var q = s0.slice(a + SIM_H1.length, b), s = s0.slice(b + SIM_H2.length);
+  return '<div class="tp-zone"><div class="tp-zone-h">他确实说过 · 可点回原信</div>' + fmtAns(q) + '</div>' +
+    '<div class="tp-zone tp-zone-sim"><div class="tp-zone-h">按这些依据推演 · 模拟，不是他的原话</div>' + fmtAns(s) + '</div>';
+}
+function fmtBody(m){
+  return (m && m.sim) ? fmtSim(m.raw || '') : fmtAns((m && m.raw) || '');
+}
+
 /* 花了多少、查了几轮，摆在答案底下：接的是要花钱的模型，读者有权知道 */
 function fmtMeta(m){
   if (!m) return '';
@@ -1997,7 +2039,7 @@ function fmtSrcs(list){
 
 /* 本地服务的地址：页面如果就是它自己托管的，用相对路径；
    双击 html（file://）打开的，就直奔 127.0.0.1:8099。 */
-var TM = { online: null, base: '', mode: 'builtin', model: 'flash', web: true, ctrl: null, probing: false, free: null };
+var TM = { online: null, base: '', mode: 'builtin', model: 'flash', web: true, ctrl: null, probing: false, free: null, modeAsk: 'archive' };
 /* 访问者自带密钥：公网实例上服务端没有密钥，谁用谁填自己的，只存在这台浏览器里。
    本机实例服务端自带密钥，这个值是空的，也不会被发出去。 */
 var TKEY = '';
@@ -2082,6 +2124,32 @@ function talkUpdateState(){
   if (hp) hp.innerHTML = talkHeroP();
 }
 
+/* 分身模式的页眉文案：常驻标明是模拟，不假装是本人观点 */
+function talkSubText(){
+  return TM.modeAsk === 'simulate'
+    ? '巴菲特虚拟化身 · 模拟推演，非本人观点 · 不构成任何投资建议'
+    : '拉把椅子，听老先生慢慢讲投资与人生 · 关于他本人说过什么，只回答查得到出处的部分';
+}
+function talkEventHint(){
+  return TM.modeAsk === 'simulate'
+    ? '<b>分身模式</b> · 把今天发生的事实写清楚，模型不许替你补事实；右边写你想问的，留空就默认问「你会怎么想？」'
+    : '这两栏只在「问分身」模式下使用 · 当前是「查原话」模式';
+}
+/* 切模式绝不整页 render：审计脚本会真点每个按钮，重绘会把正在点的元素换成 0×0 的幽灵。
+   只改类名、提示文字和 placeholder。 */
+function talkSetMode(m){
+  TM.modeAsk = (m === 'simulate') ? 'simulate' : 'archive';
+  var a = document.getElementById('talk-mode-arc'), s = document.getElementById('talk-mode-sim');
+  if (a) a.className = 'tp-mode-btn' + (TM.modeAsk === 'archive' ? ' on' : '');
+  if (s) s.className = 'tp-mode-btn' + (TM.modeAsk === 'simulate' ? ' on' : '');
+  var sub = document.getElementById('tp-sub'); if (sub) sub.textContent = talkSubText();
+  var eh = document.getElementById('talk-event-h'); if (eh) eh.innerHTML = talkEventHint();
+  var ev = document.getElementById('talk-event');
+  if (ev) ev.className = 'tp-event' + (TM.modeAsk === 'simulate' ? '' : ' off');
+  var ti = document.getElementById('talk-in');
+  if (ti) ti.placeholder = TM.modeAsk === 'simulate' ? '想问分身什么？例如：你会怎么想？' : '请教巴菲特一个问题…';
+}
+
 function talkPage(){
   var online = TM.online === true;
   var byo = online && TM.mode === 'byo';
@@ -2094,17 +2162,26 @@ function talkPage(){
   return '<div class="talk-page">' +
     '<div class="tp-head"><div class="tp-brand">' + cupSVG(22) + '巴菲特午餐会' + state + '</div>' +
       '<a class="tp-back" href="#/">← 返回知识库</a></div>' +
-    '<div class="tp-sub">拉把椅子，听老先生慢慢讲投资与人生 · 关于他本人说过什么，只回答查得到出处的部分</div>' +
+    '<div class="tp-sub" id="tp-sub">' + talkSubText() + '</div>' +
     '<div id="talk-body">' + body + '</div>' +
     /* 输入框和它下面那排开关要一起粘在底部：单独粘输入框的话，
        长答案滚到一半时开关就被挤出视口，等于没有。 */
     '<div class="tp-bar">' +
+      '<div class="tp-event' + (TM.modeAsk === 'simulate' ? '' : ' off') + '" id="talk-event">' +
+        '<div class="tp-event-h" id="talk-event-h">' + talkEventHint() + '</div>' +
+        '<input id="talk-fact" type="text" autocomplete="off" placeholder="发生的事实：例如某白酒龙头三季度业绩低于预期，今天跌停" value="' + esc(TALK.evFact) + '">' +
+        '<input id="talk-guess" type="text" autocomplete="off" placeholder="我想问的（可留空）：例如你会怎么想？" value="' + esc(TALK.evGuess) + '">' +
+      '</div>' +
       '<div class="tp-composer">' +
         '<button class="tp-new" id="talk-new">+ 新对话</button>' +
         '<input id="talk-in" type="text" autocomplete="off" placeholder="请教巴菲特一个问题…" value="' + esc(TALK.draft) + '">' +
         '<button class="tp-send" id="talk-send">提问</button>' +
       '</div>' +
       '<div class="tp-opts">' +
+        '<span class="tp-modes">' +
+          '<button class="tp-mode-btn' + (TM.modeAsk === 'archive' ? ' on' : '') + '" id="talk-mode-arc">查原话</button>' +
+          '<button class="tp-mode-btn' + (TM.modeAsk === 'simulate' ? ' on' : '') + '" id="talk-mode-sim">问分身</button>' +
+        '</span>' +
         '<label><input type="checkbox" id="talk-web"' + (TM.web ? ' checked' : '') + '> 允许联网核实（信件之外的事才用）</label>' +
         '<label><input type="checkbox" id="talk-pro"' + (TM.model === 'pro' ? ' checked' : '') + '> 深思模式（更慢、更细）</label>' +
         (showKey ? '<button class="tp-keybtn" id="talk-keybtn">' + (TKEY ? '已填密钥 · 更换' : '填我的 DeepSeek 密钥') + '</button>' : '') +
@@ -2121,6 +2198,7 @@ function talkPage(){
       '</div>' : '') +
     '</div>' +
     '<p class="tp-note">回答基于巴菲特公开信件整理，不构成任何投资建议。' +
+      '分身模式会把「他确实说过」与「按这些依据推演」分开，推演不是他的原话。' +
       (online ? '每条引文都能点回原信。' : '离线模式只在字面上匹配原文，不含推理。') + '</p>' +
     '<p class="tp-mem">他会慢慢记住你是谁、关心什么（存在本机的 agent-memory.json 里）· ' +
       '<button id="talk-forget">让他忘掉关于我的一切</button></p>' +
@@ -2132,11 +2210,20 @@ function talkPage(){
    联不上就退回页面内的关键词检索，并且在界面上明说是离线模式 —— 不装。 */
 function talkAsk(q){
   q = String(q || '').trim();
-  if (!q || TALK.busy) return;
+  var sim = (TM.modeAsk === 'simulate');
+  var fact = (((document.getElementById('talk-fact') || {}).value) || TALK.evFact || '').trim();
+  var guess = (((document.getElementById('talk-guess') || {}).value) || TALK.evGuess || '').trim();
+  if ((!q && !(sim && fact)) || TALK.busy) return;
+  /* 分身模式把「事实」和「想问的」分开发：事实由读者给，不许模型自己补 */
+  var qFull = q;
+  if (sim){
+    qFull = (fact ? '【今天发生的事实】' + fact : '（读者没有填写今天的事实）') +
+      '\n【我想问的】' + (q || guess || '你会怎么想？');
+  }
   TALK.busy = true;
   TALK.draft = '';
-  TALK.msgs.push({ r: 'u', t: q });
-  TALK.msgs.push({ r: 'b', raw: '', steps: [], sources: [], live: true });
+  TALK.msgs.push({ r: 'u', t: qFull });
+  TALK.msgs.push({ r: 'b', raw: '', steps: [], sources: [], live: true, sim: sim });
   var idx = TALK.msgs.length - 1;
   render();
   talkScroll();
@@ -2144,7 +2231,7 @@ function talkAsk(q){
   if (TM.online !== true){
     talkProbe();
     /* 探活是异步的，先把这次当离线答；下次进来就是 agent 了 */
-    talkLocalFallback(q, idx);
+    talkLocalFallback(qFull, idx);
     return;
   }
   /* 两种要先填密钥的情形，当场拦下，免得白跑一趟服务端：
@@ -2167,7 +2254,7 @@ function talkAsk(q){
     if (route() === '/talk'){ render(); talkScroll(); }
     return;
   }
-  talkStream(q, idx);
+  talkStream(qFull, idx);
 }
 
 /* 关键词检索兜底：没有任何 AI，纯字面匹配，界面上会如实标注 */
@@ -2176,6 +2263,8 @@ function talkLocalFallback(q, idx){
     var a;
     try { a = talkAnswer(q); }
     catch (e) { a = '<p>检索时出了点问题：' + esc(e && e.message ? e.message : '未知错误') + '</p>'; }
+    if (TM.modeAsk === 'simulate') a = '<p><b>分身推演需要本地 Agent 服务，现在没连上。</b>' +
+      '这一问只按字面检索原文，不做任何推演：</p>' + a;
     TALK.msgs[idx] = { r: 'b', h: a };
     var e2 = talkEnts(q)[0];
     if (e2) TALK.lastEnt = e2.n;
@@ -2212,7 +2301,7 @@ function talkPaint(idx){
       m.steps.map(function(s){ return '<div>· ' + esc(s) + '</div>'; }).join('') + '</div>';
   }
   html += m.live && !m.raw ? '<p class="ttyping">正在想一想该从哪儿翻起…</p>'
-    : fmtAns(m.raw || '') + (m.live ? '<span class="tp-caret"></span>' : '');
+    : fmtBody(m) + (m.live ? '<span class="tp-caret"></span>' : '');
   html += fmtSrcs(m.sources || []) + fmtMeta(m);
   box.innerHTML = html;
   talkScroll();
@@ -2226,7 +2315,7 @@ function talkStream(q, idx){
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: q, session: TALK.session, web: TM.web, model: TM.model,
-      vid: TVID, key: TKEY }),
+      mode: TM.modeAsk, vid: TVID, key: TKEY }),
     signal: TM.ctrl ? TM.ctrl.signal : undefined
   }).then(function(res){
     if (!res.ok) throw new Error('本地服务返回 ' + res.status);
@@ -2255,7 +2344,9 @@ function talkStream(q, idx){
     TALK.msgs[idx] = { r: 'b', h: '<p>连不上本地 Agent 服务了（' + esc(e && e.message ? e.message : '未知原因') + '）。' +
       '这一问先按关键词检索作答：</p>' };
     try {
-      TALK.msgs[idx].h = '<p>连不上本地 Agent 服务。这一问先按关键词检索作答：</p>' + talkAnswer(q);
+      TALK.msgs[idx].h = (TM.modeAsk === 'simulate'
+        ? '<p><b>分身推演需要本地 Agent 服务，现在没连上。</b>这一问只按字面检索原文，不做任何推演：</p>'
+        : '<p>连不上本地 Agent 服务。这一问先按关键词检索作答：</p>') + talkAnswer(q);
     } catch (e2) { TALK.msgs[idx].h += '<p>（本地检索也失败了）</p>'; }
     talkFinish(idx, null);
   });
@@ -2380,7 +2471,8 @@ function bind(){
     tin.onkeydown = function(ev){ if (ev.key === 'Enter'){ ev.preventDefault(); talkAsk(tin.value); } };
     document.getElementById('talk-send').onclick = function(){ talkAsk(tin.value); };
     document.getElementById('talk-new').onclick = function(){
-      TALK.msgs = []; TALK.draft = ''; TALK.lastEnt = ''; TALK.lastQ = ''; TALK.asked = ''; TALK.seen = {};
+      TALK.msgs = []; TALK.draft = ''; TALK.evFact = ''; TALK.evGuess = '';
+      TALK.lastEnt = ''; TALK.lastQ = ''; TALK.asked = ''; TALK.seen = {};
       /* 换会话 = 换一段新的上下文，但长期记忆是跨会话的，不清 */
       TALK.session = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
       render();
@@ -2388,6 +2480,14 @@ function bind(){
     document.querySelectorAll('.tp-topic').forEach(function(el){
       el.onclick = function(){ talkAsk(el.dataset.q); };
     });
+    var ma = document.getElementById('talk-mode-arc');
+    if (ma) ma.onclick = function(){ talkSetMode('archive'); };
+    var ms = document.getElementById('talk-mode-sim');
+    if (ms) ms.onclick = function(){ talkSetMode('simulate'); };
+    var ef = document.getElementById('talk-fact');
+    if (ef) ef.oninput = function(){ TALK.evFact = ef.value; };
+    var eg = document.getElementById('talk-guess');
+    if (eg) eg.oninput = function(){ TALK.evGuess = eg.value; };
     var tw = document.getElementById('talk-web');
     if (tw) tw.onchange = function(){ TM.web = !!tw.checked; };
     var tp = document.getElementById('talk-pro');
