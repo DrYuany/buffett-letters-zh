@@ -68,6 +68,7 @@ async function askOnce(q, opts, qid, session) {
   const t0 = Date.now();
   const body = JSON.stringify({
     message: q, session: session, web: opts.web, model: 'flash',
+    mode: opts.mode || 'archive',
     key: opts.key, run_id: RUN_ID, qid: qid, layer: opts.layer, vid: 'eval-' + RUN_ID
   });
   let r;
@@ -124,6 +125,9 @@ async function askOnce(q, opts, qid, session) {
   let cases = [];
   if (SETS === 'all' || SETS === 'real') cases = cases.concat(loadCases('cases-real.jsonl'));
   if (SETS === 'all' || SETS === 'adv') cases = cases.concat(loadCases('cases-adv.jsonl'));
+  /* 分身单独一批：五段的判据和考据模式完全两套，混在 all 里会让旧基线没法对比。
+     要跑就明写 --set sim，判分用 eval/check_sim.js。 */
+  if (SETS === 'sim') cases = cases.concat(loadCases('cases-sim.jsonl'));
   if (ONLY.length) cases = cases.filter(c => ONLY.indexOf(c.id) >= 0);
   if (SKIP.length) cases = cases.filter(c => SKIP.indexOf(c.id) < 0);
   if (LIMIT) cases = cases.slice(0, LIMIT);
@@ -156,7 +160,8 @@ async function askOnce(q, opts, qid, session) {
   for (let i = 0; i < jobs.length; i += CONC) {
     const slice = jobs.slice(i, i + CONC);
     const rs = await Promise.all(slice.map(async j => {
-      const opts = { key: key, web: j.c.expect_web === false ? false : true, layer: j.c.layer };
+      const opts = { key: key, web: j.c.expect_web === false ? false : true, layer: j.c.layer,
+        mode: j.c.mode === 'simulate' ? 'simulate' : 'archive' };
       let r = null;
       for (let att = 0; att <= RETRY; att++) {
         r = await askOnce(j.q, opts, j.qid, j.session);
