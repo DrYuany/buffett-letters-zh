@@ -1,11 +1,11 @@
 /* 评测跑批：把 real / adv 两层的问题真的问一遍 agent。
  *
  *   用法：
- *     node eval/run_batch.js                      跑全部（real 24 + adv 12）
+ *     node eval/run_batch.js                      跑全部（real 27 + adv 12）
  *     node eval/run_batch.js --set adv            只跑对抗层
  *     node eval/run_batch.js --set real --limit 6 只跑前 6 条（先看看效果）
  *     node eval/run_batch.js --concurrency 4      并发 4 条（默认 3）
- *     node eval/run_batch.js --followup           连 followup 追问一起跑（默认不跑）
+ *     node eval/run_batch.js --followup           连 followup 追问一起跑（默认不跑；字符串/数组都支持）
  *
  * 两个设计决定，写在这里省得以后被自己推翻：
  *
@@ -133,8 +133,10 @@ async function askOnce(q, opts, qid, session) {
       jobs.push({ c: c, qid: n > 1 ? c.id + '#r' + k : c.id,
         session: RUN_ID + '-' + c.id + (n > 1 ? '-r' + k : ''), q: c.q });
     }
-    if (WITH_FU && c.followup) {
-      c.followup.forEach((fq, i) => {
+    /* followup 早期写成字符串，后来也有写成数组的；两种都吃，别让一道题把整批带崩 */
+    const fus = Array.isArray(c.followup) ? c.followup : (c.followup ? [c.followup] : []);
+    if (WITH_FU && fus.length) {
+      fus.forEach((fq, i) => {
         jobs.push({ c: c, qid: c.id + '#f' + (i + 1), session: RUN_ID + '-' + c.id, q: fq, followup: i + 1 });
       });
     }
