@@ -2027,13 +2027,20 @@ function fmtCite(s, cmap){
     }
     var y = (a.match(/\d{4}/) || [''])[0];
     var txt = y || look.name || '资料';
+    /* 模型偶尔把「2011 巴菲特致股东信」写成「2011巴菲特致股东信」，
+       差一个空格就查不到信。这里补一次空格再查，别让读者点到空页。 */
+    var key = a, hit = L && L[key];
+    if (!hit && /^\d{4}/.test(a)){
+      var alt = a.replace(/^(\d{4})/, '$1 ');
+      if (L && L[alt]) { key = alt; hit = L[alt]; }
+    }
     /* 不是信里的段（股东大会、演讲、访谈）没有可跳的段落页。
        旧答案里可能有这种标记，画成不可点的符号，别给读者一个 404 链接。 */
-    if (!(L && L[a])){
+    if (!hit){
       return '<span class="ct-cite ct-' + (look.k || 'other') + '" title="' + esc(a) + ' · 这份材料没有段落链接">' +
         '<span class="cic">' + (look.icon || '🔖') + '</span><span class="cn">' + esc(txt) + '</span></span>';
     }
-    return '<a class="ct-cite ct-' + (look.k || 'other') + '" href="#/l/' + encodeURIComponent(a) + '?b=' + encodeURIComponent(b) + '"' +
+    return '<a class="ct-cite ct-' + (look.k || 'other') + '" href="#/l/' + encodeURIComponent(key) + '?b=' + encodeURIComponent(b) + '"' +
       ' title="' + esc(a) + ' · 第 ' + esc(b) + ' 段（点开读原文）">' +
       '<span class="cic">' + (look.icon || '🔖') + '</span><span class="cn">' + esc(txt) + '</span></a>';
   }).replace(/〔([A-Za-z0-9\u4e00-\u9fa5\-_]+)〕/g, '<span class="tp-case">🎬 $1</span>');
