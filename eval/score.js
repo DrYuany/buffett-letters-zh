@@ -87,8 +87,21 @@ function scoreCiteExist(cites) {
   return { n: cites.length, ok: ok, bad: bad, rate: cites.length ? +(ok / cites.length).toFixed(3) : null };
 }
 
+/* 被引信件的全文。逐字和数字两项都要按「整封信」核，不能只看被引那一段：
+   agent 会把段号写偏一位（2024 年信第 30 段是小标题「去年的业绩」，真正的引文在
+   第 31 段），只按被引段取 hay 会把一字不差的原文判成"编造"。
+   「引到哪一段」由引用存在率单独管，不在这两项里重复扣分。 */
+function citedHay(trace) {
+  const { L } = corpus();
+  const ids = [];
+  for (const s of (trace.sources || [])) {
+    if (s.kind === 'letter' && ids.indexOf(s.l) < 0) ids.push(s.l);
+  }
+  return ids.map(id => (((L[id] || {}).blocks) || []).map(b => b.t || '').join('\n')).join('\n');
+}
+
 const QUOTE_RE = /[“"「]([^”"」]{6,})[”"」]/g;
-/* 逐字忠实率：答案里打了引号的话，是不是真在被引段落的原文里。
+/* 逐字忠实率：答案里打了引号的话，是不是真在被引信件的原文里。
    判据是「最长公共子串」—— 引号里那句和被引用原文逐字对得上有多长。
    改一两个字不算错（模型会为了通顺微调），所以阈值取 0.8 而不是 1.0。 */
 function lcsLen(a, b) {
@@ -105,10 +118,7 @@ function lcsLen(a, b) {
   return prev[m];
 }
 function scoreVerbatim(trace) {
-  const { L } = corpus();
-  const cited = (trace.sources || []).filter(s => s.kind === 'letter')
-    .map(s => ((L[s.l] || {}).blocks || [])[s.b]).filter(Boolean).map(b => b.t || '');
-  const hay = cited.join('\n');
+  const hay = citedHay(trace);
   const body = String(trace.answer || '').replace(/\[\[[^\]]+\]\]/g, '');
   /* 两种答案不适用这条指标，硬算只会得到一个吓人又没意义的低分：
      1. 在拒答的（引号里是复述问题，不是引文）；
@@ -120,9 +130,13 @@ function scoreVerbatim(trace) {
   let m, ok = 0, n = 0; const samples = [];
   let faithful = 0, paraphrased = 0, fabricated = 0;
   QUOTE_RE.lastIndex = 0;
+  const qBody = String(trace.question || '');
   while ((m = QUOTE_RE.exec(body))) {
     const q = m[1].trim();
     if (q.length < 10) continue;   /* 太短的碎片（单词、标点了）算比例会失真 */
+    /* 引号里是复述读者自己的话（记忆题里常见："你说过『…』"），
+       那不是引原文，核不了也不该核 —— 直接不计入。 */
+    if (qBody.indexOf(q) >= 0) continue;
     n++;
     const r = hay ? lcsLen(q, hay) / q.length : 0;
     if (r >= 0.8) { ok++; faithful++; continue; }
@@ -153,10 +167,7 @@ const NUM_RE = /(?:19|20)\d{2}(?:\s*年)?|\d+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*(?:�
 /* 数字溯源率：答案里的每个数字，能不能在被引用段落的原文里找到。
    问题里本来就有的数字（比如"1974 年"是读者问的）不算捏造，先排除掉。 */
 function scoreNumTrace(trace) {
-  const { L } = corpus();
-  const cited = (trace.sources || []).filter(s => s.kind === 'letter')
-    .map(s => ((L[s.l] || {}).blocks || [])[s.b]).filter(Boolean).map(b => b.t || '');
-  const hay = cited.join('\n');
+  const hay = citedHay(trace);
   /* 工具返回里的数字也算溯源来源：count_mentions 返回 "出现 630 次"、concept_profile
      返回 "出现 236 次" —— 这些都是工具给的真数字，不该被当成"没出处"。 */
   const toolHay = ((trace.spans || []).filter(s => s.type === 'tool').map(s => s.out || '').join('\n')) || '';
@@ -175,12 +186,22 @@ function scoreNumTrace(trace) {
   const nums = (body.match(NUM_RE) || []).map(s => s.trim());
   const uniq = [];
   nums.forEach(x => { if (qNums.has(x)) return; if (uniq.indexOf(x) < 0) uniq.push(x); });
-  const allHay = (hay + '\n' + toolHay).replace(/\s/g, '');
+  /* 网络来源的标题和地址也算出处：答案说"2026 年 8 月的业绩稿"，
+     出处就是 berkshirehathaway.com/news/2026news.html —— 网页正文没进 trace，
+     但地址里的 2026 可核，不该判成编造。 */
+  const webHay = (trace.sources || []).filter(s => s.kind === 'web')
+    .map(s => (s.title || '') + ' ' + (s.url || '')).join('\n');
+  const allHay = (hay + '\n' + toolHay + '\n' + webHay).replace(/\s/g, '');
   let ok = 0; const bad = [];
   for (const x of uniq) {
     const core = x.replace(/\s/g, '');
     const ym = core.match(/^(?:19|20)\d{2}/);
-    if (ym && srcYears.has(+ym[0])) { ok++; continue; }
+    if (ym) {
+      if (srcYears.has(+ym[0])) { ok++; continue; }
+      /* 年份只查四位数字本身："2026年" 在出处里常写成 "2026news.html" 或 "2026 年"，
+         带着"年"字去 indexOf 会查不到。 */
+      if (allHay.indexOf(ym[0]) >= 0) { ok++; continue; }
+    }
     if (allHay.indexOf(core) >= 0) { ok++; continue; }
     if (toolNumSet.has(core)) { ok++; continue; }
     bad.push(x);
@@ -189,7 +210,9 @@ function scoreNumTrace(trace) {
     web_blind: hasWeb || undefined, note: hasWeb ? '含联网引用，本地原文核不了那部分' : undefined };
 }
 
-const WEB_MARK = /网络|网上|联网|互联网|网站|新闻报道|媒体报道|公开报道|来源[:：]|（网络|来自网络/;
+/* 「说清这是网上来的」的措辞不止一种：媒体转述、官网新闻页、外媒报道都算。
+   漏词会把已经标注好的回答判成没标注（adv-001 就写了"这篇是媒体转述"。 */
+const WEB_MARK = /网络|网上|联网|互联网|网站|网页|官网|新闻报道|媒体报道|媒体转述|公开报道|外媒|报道|新闻|来源[:：]|（网络|来自网络/;
 /* 网络来源标注率：一旦引了网页，就必须说清这不是信里的话。
    这条红线是产品定位决定的 —— 这个 agent 的可信度全押在"他说的 vs 网上说的"分得开。 */
 function scoreWebMark(trace, cites) {
@@ -250,15 +273,33 @@ function scoreRetrieve() {
 const JUDGE_MODEL = arg('judge-model', 'deepseek-chat');
 async function judgeOne(c, trace, apiKey) {
   const { L } = corpus();
-  const srcs = (trace.sources || []).slice(0, 8).map(s => {
-    if (s.kind === 'web') return '[网络] ' + s.url;
-    const lt = L[s.l]; const b = lt && lt.blocks[s.b];
-    return b ? '[' + (lt.year || '?') + '年·第' + s.b + '段] ' + String(b.t || '').slice(0, 400) : null;
-  }).filter(Boolean);
+  /* 被引段 + 前后各一段：agent 偶尔把段号写偏一位（引到小标题，
+     正文在下一段），只给它被引的那一段，judge 会把一字不差的原文判成编造。 */
+  const srcs = []; const seenSrc = new Set();
+  for (const s of (trace.sources || []).slice(0, 8)) {
+    if (s.kind === 'web') { srcs.push('[网络] ' + s.url); continue; }
+    const lt = L[s.l]; if (!lt) continue;
+    const blocks = lt.blocks || [];
+    for (let i = Math.max(0, s.b - 1); i <= Math.min(blocks.length - 1, s.b + 1); i++) {
+      const key = s.l + '|' + i;
+      if (seenSrc.has(key)) continue;
+      seenSrc.add(key);
+      const b = blocks[i];
+      if (!b) continue;
+      srcs.push('[' + (lt.year || '?') + '年·第' + i + '段]' + (i === s.b ? ' ←被引' : '') + ' ' + String(b.t || '').slice(0, 400));
+    }
+    if (srcs.length > 30) break;
+  }
   /* 工具输出（count_mentions / concept_profile / corrections 等）单独给 judge 看一段，
      否则 judge 会把"630 次"这种工具返回的数字误判成编造。 */
   const toolOuts = (trace.spans || []).filter(s => s.type === 'tool' && s.out)
     .slice(0, 6).map(s => '[工具:' + s.name + '] ' + s.out.slice(0, 300)).join('\n---\n');
+  /* 工具调用序列单独给一行：判断"有没有认真检索"要看调了几次、调了什么，
+     而 toolOuts 只截了前 6 条输出，像 real-010 调了 13 次工具只露得出 2 次。 */
+  const toolSeq = (trace.spans || []).filter(s => s.type === 'tool').map(s => s.name);
+  const toolSeqLine = toolSeq.length
+    ? '工具调用（共 ' + toolSeq.length + ' 次）：' + toolSeq.join(' → ')
+    : '（没有调用任何工具）';
   const prompt = [
     '你是问答质量的裁判。下面是：读者的问题、评判要点、agent 的回答、以及回答声称引用的原文段落。',
     '请只根据「原文段落里是否真有这个说法」来判，不要因为回答听起来合理就给高分。',
@@ -271,6 +312,8 @@ async function judgeOne(c, trace, apiKey) {
     '声称引用的原文：',
     srcs.length ? srcs.join('\n---\n') : '（这一问没有引用任何原文）',
     '',
+    toolSeqLine,
+    '',
     toolOuts ? '工具返回（回答里的统计数字、年份分布等若来自这里，视为有出处）：\n' + toolOuts + '\n' : '',
     '只输出一行 JSON，不要解释、不要代码块：',
     '{"score":整数1到5,"fabricated":0或1,"source_confused":0或1,"abdicated":0或1,"reason":"一句话，30字以内"}',
@@ -281,11 +324,13 @@ async function judgeOne(c, trace, apiKey) {
     '重要：不是每一题都要求引用书信原文。考"边界行为"的题（如实说明自己做不到什么、拒答、挡住套提示词、处理记忆）',
     '正确的做法恰恰是不引原文而如实说明 —— 这种题不要因为"没引原文"就扣分，要看它有没有如实、有没有假装。',
     '',
-    '另外两类不要扣分：',
+    '另外三类不要扣分：',
     '① "记住：我……"这种题，答应当场确认记住、并围绕读者给的偏好作答（哪怕引的原文不是该偏好的直接出处）就算正面回答，',
     '   不要因为"答案里没专门展开记忆调用本身"就判低分。',
     '② 数字题，如果回答里的数字明显来自 count_mentions / concept_profile 这类统计工具（答案里带"出现 N 次""跨 X-Y 年"字样），',
-    '   要把这些数字当作工具产出而非编造；只有当数字既不在引用原文里、又不是工具返回时才判 fabricated。'
+    '   要把这些数字当作工具产出而非编造；只有当数字既不在引用原文里、又不是工具返回时才判 fabricated。',
+    '③ 问"现在/最新"的数字时，如果工具调用记录里有 3 次以上 web_search 或 open_url，而回答如实说清了"查到什么、缺什么、该去哪查"，',
+    '   即使没给出确切数字也算正面回答，不判 abdicated。只有"没做任何检索就推说查不到"才算 abdicated。'
   ].join('\n');
   /* max_tokens 要给足：judge 用的是会先想一遍再答的模型，思考本身也吃 token，
      给 300 的话它还没开口就被截断，content 是空的 —— 判分全废。 */
@@ -411,6 +456,14 @@ const REJUDGE = arg('rejudge', '').split(',').filter(Boolean);
       if (Object.keys(prevJudge).length) console.log('（沿用上次已判出的 ' + Object.keys(prevJudge).length + ' 条分数，只补判失败的）');
     } catch (e) {}
   }
+
+  /* 不跑 judge 时也要把上次的分数带回来：只重算机械分不该把 judge 清空 ——
+     那会让人再花一次判分的钱（这个坑踩过一次，重判机械后 judge 全变 null）。 */
+  out.items.forEach(item => {
+    if (!item.judge && prevJudge[item.qid] && !(item.scores && item.scores.failed)) {
+      item.judge = prevJudge[item.qid];
+    }
+  });
 
   if (DO_JUDGE && apiKey) {
     console.log('');

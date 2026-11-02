@@ -58,10 +58,19 @@ let SITUATION = null;
 try { SITUATION = require('./situation'); }
 catch (e) { console.log('  （未找到案例库，分身模式不可用；先跑 node extract_cases.js）'); }
 
-/* 口语语料：1994-2025 股东大会问答的中译。没有它也能跑，只是少了"他当面怎么说"这一层。 */
+/* 股东大会语料，两套并存，优先用新的：
+     MEETING = 1994-2026 中文全文，2.5 万段 156 万字（服务端加载，不进页面）
+     TALK    = 380 条英文字幕中译的精选（页面要用，体积小）
+   新的那份能逐字引用，旧的那份只能转述 —— 返回的说明文字要跟着换。 */
+let MEETING = null;
+try {
+  MEETING = require('./meeting');
+  if (!MEETING.SEGS.length) MEETING = null;
+} catch (e) { /* 没生成就退回 380 条 */ }
 let TALK = null;
 try { TALK = require('./talk'); }
 catch (e) { console.log('  （未找到口语语料，先跑 node build_talk.js / node make_talk.js）'); }
+if (!MEETING && !TALK) console.log('  （两种股东大会语料都没有，先跑 python build_meeting_zh.py）');
 
 /* 公众演讲语料：1985-2025 的大学演讲与媒体专访（中文）。
    和股东大会问答是两种场合——对着 MBA 学生讲的和被股东追问的，分量不一样，
@@ -448,7 +457,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'talk_search',
-      description: '在股东大会问答里找他当面说过的话（1994-2025，口语体，中译）。问「他当时怎么回答股东」「他现场是怎么说的」时用这个。返回的是英文字幕的中译，只能当转述，不能逐字引用。',
+      description: '在 1994-2026 股东大会问答里找他当面说过的话（中文全文，2.5 万段，可逐字引用）。问「他当时怎么回答股东」「他现场是怎么说的」「他在哪一年的会上说过」时用这个。这是他回答股东提问的场合，和写进给股东的信分量不同。',
       parameters: {
         type: 'object',
         properties: {
@@ -600,6 +609,31 @@ async function toolCall(name, args, asOf) {
       const lt = L[l];
       if (!lt || !lt.blocks[bi]) return { text: '没有找到这一段，检查 letter_id 和 block 是否正确。' };
       if (lt.year > YMAX) return { text: TIME_UP(lt.year) };
+      const b0 = lt.blocks[bi];
+      /* 小标题段本身没有内容。以前的实现只把「去年的业绩」这 5 个字返给模型，
+         模型就凭记忆把下一段的正文补了出来 —— 2024 年信第 30 段是真实案例，
+         判分器据此判了「编造」，其实原文第 31 段一字不差。这里改成：
+         明确说「这是小标题」，并把这一节的正文一起带出来，引用标记直接给正文段号。 */
+      if (b0.k === 'h' || b0.k === 'h2') {
+        const body = []; let first = -1;
+        for (let i = bi + 1; i < lt.blocks.length && body.length < 3; i++) {
+          const b2 = lt.blocks[i];
+          if (b2.k === 'h' || b2.k === 'h2') break;
+          const t = (b2.t || '').trim();
+          if (t.length < 8) continue;
+          if (first < 0) first = i;
+          body.push(`第 ${i} 段：${t.slice(0, 700)}`);
+        }
+        if (!body.length) return {
+          text: `第 ${bi} 段是小标题「${(b0.t || '').trim()}」，这一节下面没有正文。不要引用这一段，也不要凭印象补内容。`,
+          sources: []
+        };
+        return {
+          text: `${lt.title || l}（${lt.year} 年）\n第 ${bi} 段是小标题「${(b0.t || '').trim()}」，不是正文。这一节的正文：\n\n` +
+            body.join('\n\n') + `\n\n引用请引正文段：[[${l}|${first}]]`,
+          sources: [{ kind: 'letter', l: l, b: first, y: lt.year }]
+        };
+      }
       const around = [];
       for (let i = Math.max(0, bi - 1); i <= Math.min(lt.blocks.length - 1, bi + 1); i++) {
         around.push(`第 ${i} 段：${(lt.blocks[i].t || '').slice(0, 700)}`);
@@ -618,7 +652,7 @@ async function toolCall(name, args, asOf) {
       (L[lt.id] || { blocks: [] }).blocks.forEach((b, i) => { if (b.k === 'h' || b.k === 'h2') heads.push(`第 ${i} 段 ${b.t}`); });
       const top = (LT_MENTIONS[lt.id] || []).sort((a, b) => b.c - a.c).slice(0, 12).map(x => x.n);
       return {
-        text: `${lt.title}（${lt.year} 年，共 ${lt.n} 段）\n小标题：\n${heads.slice(0, 40).join('\n') || '（这封信没有小标题）'}\n\n这一年反复提到：${top.join('、')}\n引用标记：[[${lt.id}|0]]`,
+        text: `${lt.title}（${lt.year} 年，共 ${lt.n} 段）\n小标题（这些段号只是小标题、本身没有正文；要用 open_passage 打开才会给出这一节的正文）：\n${heads.slice(0, 40).join('\n') || '（这封信没有小标题）'}\n\n这一年反复提到：${top.join('、')}\n引用标记：[[${lt.id}|0]]`,
         sources: [{ kind: 'letter', l: lt.id, b: 0, y: lt.year }]
       };
     }
@@ -750,19 +784,24 @@ async function toolCall(name, args, asOf) {
       return { text, sources };
     }
     case 'talk_search': {
-      if (!TALK) return { text: '口语语料没生成。先跑 node build_talk.js 和 node make_talk.js。' };
-      const hits = TALK.search(String(args.query || ''), { k: 12 })
+      const M = MEETING || TALK;
+      if (!M) return { text: '股东大会语料没生成。先跑 python fetch_meeting_zh.py 和 python build_meeting_zh.py。' };
+      const hits = M.search(String(args.query || ''), { k: 12 })
         .filter(x => x.y <= YMAX).slice(0, Math.min(6, Math.max(1, +args.k || 4)));
       if (!hits.length) return { text: '股东大会问答里没找到相关段落。' };
+      const sess = s => s === 'Morning_Session' ? '上午场' : s === 'Afternoon_Session' ? '下午场' : '';
       const body = hits.map((x, i) =>
-        `[${i + 1}] ${x.y} 年股东大会${x.at ? '（' + mmss(x.at) + '）' : ''}\n` +
+        `[${i + 1}] ${x.y} 年股东大会` +
+        (x.session ? '（' + sess(x.session) + '）' : x.at ? '（' + mmss(x.at) + '）' : '') +
+        (x.title ? ' · ' + x.title : '') + '\n' +
         (x.ask ? `股东问：${x.ask}\n` : '') +
         `他答：${x.ans}`
       ).join('\n\n');
       return {
-        text: `【股东大会现场原话的中译 · 只能转述，不可逐字引用】\n${body}\n\n` +
-          `（以上是 1994-2025 年股东大会问答的英文字幕转译，不是致股东信原文。要逐字引用只能回到信里。）`,
-        sources: hits.filter(x => x.quote).map(x => ({ kind: 'letter', l: x.quote.l, b: x.quote.b, y: x.y })),
+        text: `【股东大会现场原话${MEETING ? ' · 中英对照全文的中文侧，可逐字引用' : ' · 英文字幕转译，只能转述'}】\n${body}\n\n` +
+          `（以上是股东大会问答，不是致股东信。信是他斟酌过的书面判断，会上是当场答问——` +
+          `同一个问题，两处的说法可能不一样，这本身就是信息。）`,
+        sources: [],
       };
     }
     case 'speech_search': {
@@ -941,9 +980,12 @@ ${stanceBlock}${mindBlock}
 2. 工具没给你原文，就不能说他讲过。宁可回答"这 ${C.meta.letters} 封信里没查到"，也不要替他把话补完。
 3. 每段原文证据后面都跟它的引用标记（形如 [[1988 巴菲特致股东信|12]] 或 [[web|网址]]），照抄工具输出，一个字都不要改。
 4. ${C.meta.years[1]} 年之后的事要用 web_search 查，答案里必须说清这是网络来源，不能和他信里写的话混在一起。
-5. 数字（回报率、价格、年份、持股比例）一律来自工具输出，不得推算拼凑。被问到"X 出现了多少次""X 在多少封信里"这类次数题，必须先调 count_mentions 拿到精确数字再回答，不许凭印象估。
-6. 引号只用于逐字原文。引号里那一段必须能在原文里一字不差地找出来，否则不要用引号——你可以转述，但要让人看出来是转述，不要骗读者当成原话。
+5. 数字（回报率、价格、年份、持股比例）一律来自工具输出，不得推算拼凑。信里没写的数字（股东大会问答、年报数据、市值、资本基数），要么用 web_search 查到出处再给，要么就不给——不许拿记忆里的旧数字凑数。被问到"X 出现了多少次""X 在多少封信里"这类次数题，必须先调 count_mentions 拿到精确数字再回答，不许凭印象估。
+6. 引号只用于逐字原文。引号里那一段必须能在原文里一字不差地找出来，否则不要用引号——你可以转述，但要让人看出来是转述，不要骗读者当成原话。你自己的解释、自己的推算、自己的总结，一律不加引号，哪怕你觉得说得很准。
 7. 工具没查到、就是没查到。问"他对子女教育的看法"如果信里没说，就直说没说，不许拿别处谈"教育"的句子拼凑引申。
+8. open_passage 说"这是小标题"时，正文在它给出的下一段。引用必须指向真正读到那句话的正文段，不许引小标题段，更不许凭记忆把小标题下面的正文补出来。
+9. 问"现在/最近/今年"的数字（现金储备、持仓、股价、业绩），信只写到 ${C.meta.years[1]} 年，必须 web_search 并打开官网或财报原文。确实拿不到确切数字时，说清"查了什么、拿到什么、缺什么、该去哪查"，不要只回一句"查不到"就完事。
+10. 信外的语录（股东大会问答、演讲、访谈、新闻里的原话），你手上没有可逐字核对的原文，一律转述、不加引号；非要引就注明是哪个场合、并给出网页链接。引号是给信里原文用的，不是给"你记忆里他说过的话"用的。
 ${voiceBlock(opts.noVoice)}
 ${BOUNDS}
 ${work}
@@ -1331,6 +1373,9 @@ function json(res, code, obj) {
 const TRACE_DIR = path.join(ROOT, 'eval', 'traces');
 let _traceQ = Promise.resolve();
 function appendTrace(rec) {
+  /* 空记录不落盘：曾经有 117 行 {} 被写进 undefined.jsonl（没有 date 就拼不出文件名）。
+     记 trace 是旁支，宁可不记，也不要往评测目录里倒垃圾。 */
+  if (!rec || !rec.date) return Promise.resolve();
   _traceQ = _traceQ.then(async () => {
     try {
       await fsp.mkdir(TRACE_DIR, { recursive: true });
