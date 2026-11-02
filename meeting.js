@@ -20,26 +20,69 @@ let META = null;
 function load() {
   if (!fs.existsSync(FILE)) return;
   const rows = fs.readFileSync(FILE, 'utf8').split('\n')
-    .filter(Boolean).map(l => JSON.parse(l))
-    .filter(r => r.who === 'buffett' && r.text && r.text.length >= 20);
-  /* 问答配对：他这段往前找最近一段别人说的话当提问。跨场次不配。 */
+    .filter(Boolean).map(l => JSON.parse(l));
+  /* 问答配对：不能只留 buffett 段——股东提问用的是完整的自然语言，
+     正是最好的检索入口，丢掉就等于把 5.5 万段提问白扔了。
+     按 (年, 场次) 分组、组内按 n 排序，他每段往前找最近的提问。
+     一个提问常被切成好几段（追问、补充、主持人报编号），只取最后一段会拿到
+     「如果不能，这对未来回报意味着什么？」这种残句，所以连续几段要拼起来。 */
   const byFile = {};
   for (const r of rows) (byFile[r.y + '|' + r.session] = byFile[r.y + '|' + r.session] || []).push(r);
   const all = [];
+  let nAsk = 0;
   for (const k in byFile) {
-    const arr = byFile[k];
-    for (let i = 0; i < arr.length; i++) {
-      all.push(arr[i]);
+    const arr = byFile[k].sort((a, b) => (a.n || 0) - (b.n || 0));
+    let buf = [], lastAsk = '';
+    for (const r of arr) {
+      if (r.who === 'other') {
+        if (r.text && r.text.length >= 8) buf.push(r.text);
+        continue;
+      }
+      if (r.who !== 'buffett' || !r.text || r.text.length < 20) continue;
+      if (buf.length) {
+        lastAsk = pickAsk(buf);
+        buf = [];
+      }
+      if (lastAsk) nAsk++;
+      /* 同一个提问下他连着答几段时并成一段：转录常把开场寒暄单独切出来
+         （「有趣的是你区分了爱尔兰的更多阳光」），它短、命中词少，
+         长度归一化后反而排在真正的回答前面。并到上一段就压住了。 */
+      const prev = all[all.length - 1];
+      if (prev && lastAsk && prev.ask === lastAsk && prev.r.text.length < 60) {
+        prev.r = Object.assign({}, prev.r, { text: prev.r.text + ' ' + r.text });
+        continue;
+      }
+      all.push({ r, ask: lastAsk });
     }
   }
-  SEGS = all.map(r => ({
+  SEGS = all.map(({ r, ask }) => ({
     y: r.y, session: r.session, ch: r.ch, title: r.title || '',
-    ans: r.text, ask: '', src: 'meeting',
+    ans: r.text, ask, src: 'meeting',
   }));
-  META = { segs: SEGS.length, chars: SEGS.reduce((s, x) => s + x.ans.length, 0), file: FILE };
+  META = {
+    segs: SEGS.length, chars: SEGS.reduce((s, x) => s + x.ans.length, 0),
+    asked: nAsk, file: FILE,
+  };
 }
 try { load(); } catch (e) { console.log('  （股东大会中文全文未加载：' + e.message + '）'); }
 
+/* 从连着几段「别人说的」里挑出真正的提问。
+   股东大会的 other 段混着三种东西：股东的提问、主持人的开场白（「沃伦和查理
+   都不知道我们要问什么」）、投票计票结果（「28,452 票赞成」）。后两种当检索
+   入口会带来假阳性，所以只认带问号的句子；一个问号都没有的，只有短的才留下
+   （有些提问是陈述句式：「我想知道你对比特币的看法」）。 */
+function pickAsk(buf) {
+  const all = buf.join(' ');
+  const parts = all.split(/(?<=[。！？?])/).map(x => x.trim()).filter(Boolean);
+  const qs = parts.filter(p => /[？?]/.test(p));
+  if (qs.length) {
+    /* 取最后两个问句：前面的多是寒暄和自我介绍 */
+    const s = qs.slice(-2).join('');
+    return s.length > 320 ? s.slice(-320) : s;
+  }
+  if (all.length > 60) return '';
+  return all;
+}
 const TSTOP = '的了吗呢吧啊呀么怎你您我他她它这那有是会就要能可以什么为如何请告诉一下说说讲讲看想觉得把被让给对从到和与跟更最很太都也还又再就才只请您多少几个';
 function terms(q) {
   const out = [], seen = {};
@@ -60,7 +103,13 @@ function terms(q) {
   });
   return out;
 }
-const TEXT = SEGS.map(s => (s.title || '') + ' ' + (s.ans || ''));
+/* 检索文本分两路：正文（标题+回答）满分，提问半分。
+   提问是好入口，但它是别人的话——「你认为估值太高了吗」这种句子在几百个
+   股东嘴里都出现过，跟正文同权会把「可口可乐」这类题挤到无关场次去。
+   长度归一化仍按正文长度算，免得长提问把段落算成「长文」而被压分。 */
+const TANS = SEGS.map(s => (s.title || '') + ' ' + (s.ans || ''));
+const TASK = SEGS.map(s => s.ask || '');
+const TEXT = SEGS.map((s, i) => TANS[i] + ' ' + TASK[i]);
 const _df = {};
 function df(g) {
   if (_df[g] != null) return _df[g];
@@ -79,14 +128,14 @@ function search(q, opts) {
   for (let i = 0; i < N; i++) {
     const s0 = SEGS[i];
     if (yr && s0.y > yr) continue;          /* 截断年份回测用 */
-    const t = TEXT[i];
+    const ta = TANS[i], tk = TASK[i];
     let s = 0;
     for (const tm of ts) {
-      if (t.indexOf(tm.g) < 0) continue;
       const idf = Math.log(1 + N / (df(tm.g) + 1));
-      s += idf * tm.w;
+      if (ta.indexOf(tm.g) >= 0) s += idf * tm.w;
+      else if (tk.indexOf(tm.g) >= 0) s += idf * tm.w * 0.5;
     }
-    if (s > 0) scored.push({ i, s: s / (1 + Math.log(1 + t.length / 200)) });
+    if (s > 0) scored.push({ i, s: s / (1 + Math.log(1 + ta.length / 200)) });
   }
   scored.sort((a, b) => b.s - a.s);
   return scored.slice(0, k).map(x => Object.assign({ score: +x.s.toFixed(2) }, SEGS[x.i]));

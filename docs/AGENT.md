@@ -57,7 +57,7 @@
 | `search_letters` | `query`, `limit` | 命中的段落，每段带 `[[letter\|信名\|段号]]` 标记 |
 | `open_passage` | `letter`, `block` | 该段原文 + 前后各一段 |
 | `letter_outline` | `year` | 这一年的信讲了几件事 |
-| `talk_search` | `query` | 股东大会问答（380 条精选，无段落标记，只能转述） |
+| `talk_search` | `query` | 股东大会问答：1994–2026 全文 18,400 段，中文侧可逐字引用（`meeting.js` 没加载时退化成 380 条精选字幕，只能转述） |
 | `speech_search` | `query`, `venue` | 1985–2025 演讲与访谈 |
 | `count_mentions` | `term` | 这个词出现过多少次、跨哪些年 |
 | `concept_profile` | `name` | 概念的跨年分期 + 逐条原文 |
