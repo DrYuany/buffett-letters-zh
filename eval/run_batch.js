@@ -6,6 +6,7 @@
  *     node eval/run_batch.js --set real --limit 6 只跑前 6 条（先看看效果）
  *     node eval/run_batch.js --concurrency 4      并发 4 条（默认 3）
  *     node eval/run_batch.js --followup           连 followup 追问一起跑（默认不跑；字符串/数组都支持）
+ *     node eval/run_batch.js --skip real-021      整批里排除某几条（记忆题要单独开记忆跑）
  *
  * 两个设计决定，写在这里省得以后被自己推翻：
  *
@@ -37,6 +38,8 @@ const RUN_ID = arg('run-id', 'rb-' + Date.now().toString(36));
 const WITH_FU = has('followup');
 /* 只跑指定 case（逗号分隔），用来补齐上次崩掉的那几条，不用整批重来 */
 const ONLY = arg('case', '').split(',').filter(Boolean);
+/* 整批里排除几条。用来跑「全量但不含记忆题」：记忆题要单独开记忆跑，混在一起会串味 */
+const SKIP = arg('skip', '').split(',').filter(Boolean);
 /* 上游偶发断流（DeepSeek 会返回 terminated）导致单条失败时重试几次。
    一条题因为网络抖动就丢掉太可惜，重跑一次的钱比补样本便宜。 */
 const RETRY = Number(arg('retry', 2));
@@ -122,6 +125,7 @@ async function askOnce(q, opts, qid, session) {
   if (SETS === 'all' || SETS === 'real') cases = cases.concat(loadCases('cases-real.jsonl'));
   if (SETS === 'all' || SETS === 'adv') cases = cases.concat(loadCases('cases-adv.jsonl'));
   if (ONLY.length) cases = cases.filter(c => ONLY.indexOf(c.id) >= 0);
+  if (SKIP.length) cases = cases.filter(c => SKIP.indexOf(c.id) < 0);
   if (LIMIT) cases = cases.slice(0, LIMIT);
 
   /* 每条 case 展开成一串任务：主问题，外加 repeat（同一问跑几次看稳不稳）
