@@ -622,19 +622,116 @@ function realUrl(href) {
   return href;
 }
 
+/* 相关性：查询里的实词有多少出现在结果的标题/域名/摘要里。
+   中文不能按空格切——「银行一年期定期存款利率」是一个整段，按长度 <3 过滤会把
+   「银行」「利率」全丢掉；改成按连续汉字段切，两个汉字就算一个词。
+   纯数字年份不算词：它几乎出现在任何页面上，算进去「2026年_百度百科」就成了相关结果。 */
 function relevance(q, hay) {
-  let hit = 0, total = 0;
-  String(q).toLowerCase().split(/[\s"']+/).forEach(tok => {
-    if (tok.length < 3) return;
-    total++;
-    if (hay.indexOf(tok) >= 0) hit++;
-  });
-  if (!total) {
-    /* 中文查询碎片化以后没有可用的词，改用查询里连着的汉字片段做包含判断 */
-    const groups = String(q).match(/[\u4e00-\u9fa5]{2,}/g) || [];
-    groups.forEach(g => { total++; if (hay.indexOf(g) >= 0) hit++; });
+  hay = String(hay || '').toLowerCase();
+  const s = String(q || '').toLowerCase();
+  let terms;
+  if (CJK.test(s)) {
+    terms = (s.match(/[\u4e00-\u9fa5]{2,}/g) || []).filter(t => !/^(年|月|日|时候|的)$/.test(t));
+    (s.match(/[a-z][a-z0-9.\-]{2,}/g) || []).forEach(t => terms.push(t));
+  } else {
+    terms = s.split(/[\s"']+/).filter(t => t.length >= 3);
   }
-  return total ? hit / total : 0;
+  if (!terms.length) return 0;
+  let hit = 0;
+  terms.forEach(t => { if (hay.indexOf(t) >= 0) hit++; });
+  return hit / terms.length;
+}
+
+/* ---------------- 搜索引擎 ----------------
+   Bing 的中文结果这两年退化得厉害：同一个词「银行一年期定期存款利率」，
+   它给的是「2026年_百度百科」「披荆斩棘2026成团名单」「特殊符号怎么打」，
+   换个机房又变成「日照暖心保」。搜狗给的才是正常结果。
+   但搜狗会限流、也会塞「推荐搜索」，所以两家都留着，按「谁的相关结果多」挑，
+   不按固定顺序试——任何一家单独出问题都不至于让分身答不出今天的数。 */
+function htmlStrip(s) {
+  return String(s || '').replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, '')
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n))
+    .replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ').trim();
+}
+
+/* 搜狗的跳转链接是 /link?url=xxx，真实地址藏在返回页的一行 JS 里：
+   window.location.replace("https://…")。多打一次请求，换一条读者真能点开的引用。 */
+async function sogouReal(href) {
+  if (/^https?:/i.test(href)) return href.replace(/&amp;/g, '&');
+  const u = 'https://www.sogou.com' + href;
+  try {
+    const r = await fetch(u, { headers: { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' } });
+    const t = await r.text();
+    const m = t.match(/location\.replace\(\s*["']([^"']+)["']/i) || t.match(/URL='([^']+)'/i);
+    if (m && /^https?:/i.test(m[1])) return m[1].replace(/&amp;/g, '&');
+  } catch (e) {}
+  return u;
+}
+
+async function sogouSearch(q) {
+  const r = await fetch('https://www.sogou.com/web?query=' + encodeURIComponent(q),
+    { headers: { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' } });
+  if (!r.ok) throw new Error('搜狗返回 ' + r.status);
+  const html = await r.text();
+  const picked = [];
+  for (const b of html.split(/<h3 class="vr-title/).slice(1)) {
+    const a = b.match(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+    if (!a) continue;
+    const title = htmlStrip(a[2]);
+    if (!title || title.length < 4) continue;
+    const cut = b.indexOf('</h3>');
+    const tail = cut >= 0 ? b.slice(cut) : b;
+    const p = tail.match(/<p[^>]*class="[^"]*(?:star-wiki|text-lightgray|space-txt)[^"]*"[^>]*>([\s\S]*?)<\/p>/)
+      || tail.match(/<div[^>]*class="[^"]*text-layout[^"]*"[^>]*>([\s\S]*?)<\/div>/)
+      || tail.match(/<p[^>]*>([\s\S]*?)<\/p>/);
+    picked.push({ title: title, href: a[1], snippet: htmlStrip(p && p[1]).slice(0, 220) });
+    if (picked.length >= 6) break;
+  }
+  /* 六条跳转并发解析，串行要等六次往返 */
+  const urls = await Promise.all(picked.map(x => sogouReal(x.href)));
+  const out = [], seen = {};
+  picked.forEach((x, i) => {
+    const link = urls[i];
+    if (!/^https?:/i.test(link)) return;
+    let host = '';
+    try { host = new URL(link).hostname.replace(/^www\./, ''); } catch (e) { return; }
+    if (seen[host]) return;
+    seen[host] = 1;
+    out.push({ title: x.title, url: link, snippet: x.snippet,
+      rel: relevance(q, (x.title + ' ' + host + ' ' + x.snippet).toLowerCase()) });
+  });
+  if (!out.length) return { results: [], warn: '搜狗这次没有返回结果。' };
+  return { results: out, warn: '' };
+}
+
+const REL_OK = 0.34;   /* 三个实词里中一个，就算沾边；低于这个基本是推荐位 */
+
+async function webSearch(q) {
+  const cands = [];
+  for (const pair of [['bing', bingSearch], ['sogou', sogouSearch]]) {
+    try {
+      const r = await pair[1](q);
+      const rel = (r.results || []).filter(x => x.rel >= REL_OK);
+      cands.push({ name: pair[0], all: r.results || [], rel: rel, warn: r.warn || '' });
+      if (rel.length >= 4) break;      /* 已经够用就不再打第二家 */
+    } catch (e) {
+      cands.push({ name: pair[0], all: [], rel: [], warn: '', err: e.message });
+    }
+  }
+  cands.sort((a, b) => b.rel.length - a.rel.length);
+  const best = cands[0];
+  if (!best || !best.all.length) {
+    return { results: [], warn: '这次两家搜索引擎都没返回结果（' +
+      cands.map(c => c.name + '：' + (c.err || '0 条')).join('；') + '）。换个说法再试。' };
+  }
+  const ok = best.rel.length > 0;
+  return {
+    results: (ok ? best.rel : best.all).slice(0, 6),
+    warn: ok ? '' : (best.warn || '注意：以下结果和关键词没有字面对应，很可能是搜索引擎的推荐位；读不出真东西就不要引用，更不许拿记忆里的数字顶上。'),
+    engine: best.name
+  };
 }
 
 function hostBlocked(host) {
@@ -751,7 +848,7 @@ async function toolCall(name, args, asOf) {
     }
     case 'web_search': {
       if (YMAX < 9999) return { text: '回测模式下不能联网：一联网就会看到今天以后的事。' };
-      const sres = await bingSearch(String(args.query || ''));
+      const sres = await webSearch(String(args.query || ''));
       const res = sres.results;
       if (!res.length) return { text: sres.warn || '这次搜索没搜到结果，换个说法再试。' };
       const body = res.map((r, i) => `[网页${i + 1}] ${r.title}\n${r.url}\n${r.snippet}\n引用标记：[[web|${r.url}]]`).join('\n\n');
@@ -1088,6 +1185,9 @@ function systemPrompt(memNotes, mode, opts) {
 【所以】
 一句明确的话：买、不买、等，或者「看不懂，不碰」。不许「因人而异」「需要综合考虑」「建议关注」。
 说看不懂就要说清看不懂的是哪一件事——不是「行业太复杂」，是「我算不出它三年后还能不能继续提价」。
+遇到拿两样东西硬比的问法（「高股息是不是比存款划算」「这股是不是比买理财强」），
+也必须落一个结论：先说清这两样按哪把尺子不可比，再说真要在两者里选，你选哪边。
+不许用「所以我给不了你结论」收尾——那是把判断推回给读者。
 
 【我可能错在哪】
 一条最可能错的地方，具体到能被人当面反驳；再加一个可观察的证伪点：
@@ -1553,9 +1653,15 @@ function triageMode(message, mode) {
   const askPast = /(他说过|他讲过|他提过|信里|原话|哪一年|哪封信|怎么说的|有没有提过|写过什么|提过几次)/.test(msg);
   const askNow = /(现在|目前|最近|今年|今天|当下|这会儿|该不该买|值不值|能不能买|能不能持有|贵不贵|便宜吗)/.test(msg);
   const askView = /(你|您)怎么(看|想)|你会怎么做|换成你|如果是你/.test(msg);
+  /* 决策型的问法：句子里没有时间词，问的却是「我现在该不该动」。
+     漏了这一类，「银行股股息率这么高，是不是比存银行划算」会被判成考据题 ——
+     实测那次退回了叙述体，五段结构和立场全丢（eval/judge.js 结构 3/5）。
+     注意别把「抄底」单独当信号：real-002「1974 年和 2008 年他抄底时」是历史题，
+     必须留在 archive。所以要求「抄底/上车/割肉」前面带决策词。 */
+  const askDecide = /(该不该|值不值|划不划算|能不能(买|持有|追|上车)|还能(追|买)|追不追|要不要(买|卖|加|减|换)|(该|能|要)不该?(抄底|上车|割肉)|是不是比.{0,14}(划算|强|稳|好)|比.{0,10}(划算|强|稳))/.test(msg);
   if (mode === 'simulate') return (askPast && !askNow && !askView) ? 'archive' : 'simulate';
   if (askPast) return 'archive';
-  return (askNow || askView) ? 'simulate' : 'archive';
+  return (askNow || askView || askDecide) ? 'simulate' : 'archive';
 }
 /* 答案里的引用标记 [[信|段]] / [[web|url]] —— 判「引用存不存在」就从这里下手。
    注意「信」那一截是信件 id（形如「2018 巴菲特致股东信」），不是数字下标。 */

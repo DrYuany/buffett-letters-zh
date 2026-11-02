@@ -2074,9 +2074,19 @@ function fmtAns(t, cmap){
    每条判断都要求带数字和可证伪点，这里只负责排版，不替它补内容。 */
 var SIM_HEADS = ['他确实说过', '现在的事实', '我怎么量它', '所以', '我可能错在哪', '按这些依据推演'];
 function fmtSim(t, cmap){
-  var s0 = String(t || '');
+  /* 模型偶尔把两种标记叠着写：{{rule-20；[[1982 巴菲特致股东信|19]]}}。
+     花括号不是这套语法的符号，原样输出就是一段乱码样的东西。
+     拆成〔rule-20〕+ 引用标记，两个都能正常渲染。 */
+  var s0 = String(t || '').replace(/\{\{([\s\S]{0,160}?)\}\}/g, function(_, inner){
+    var cites = inner.match(/\[\[[^\]]+\]\]/g) || [];
+    var id = inner.replace(/\[\[[^\]]+\]\]/g, '').replace(/[；;、,，\s]+$/, '').trim();
+    return (id ? '〔' + id + '〕' : '') + cites.join('');
+  });
   var alt = SIM_HEADS.join('|');
-  var norm = s0.replace(new RegExp('\\*{0,2}[〔【]\\s*(' + alt + ')\\s*[〕】]\\*{0,2}', 'g'), '【$1】');
+  var norm = s0.replace(new RegExp('\\*{0,2}[〔【]\\s*(' + alt + ')\\s*[〕】]\\*{0,2}', 'g'), '【$1】')
+    /* 有时它干脆不写括号，只把标题写成一行加粗：**他确实说过**。
+       这种也要认，否则整篇五段会挤成一大坨。 */
+    .replace(new RegExp('^\\s*\\*\\*\\s*(' + alt + ')\\s*\\*\\*\\s*$', 'gm'), '【$1】');
   var re = new RegExp('【\\s*(' + alt + ')\\s*】', 'g');
   var ms = [], m;
   while ((m = re.exec(norm))) ms.push({ name: m[1], at: m.index, end: m.index + m[0].length });
