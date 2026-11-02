@@ -62,6 +62,13 @@ catch (e) { console.log('  （未找到案例库，分身模式不可用；先�
 let TALK = null;
 try { TALK = require('./talk'); }
 catch (e) { console.log('  （未找到口语语料，先跑 node build_talk.js / node make_talk.js）'); }
+
+/* 公众演讲语料：1985-2025 的大学演讲与媒体专访（中文）。
+   和股东大会问答是两种场合——对着 MBA 学生讲的和被股东追问的，分量不一样，
+   引用时必须说清是哪一场。fid=notes 的只能转述。 */
+let SPEECH = null;
+try { SPEECH = require('./speech'); }
+catch (e) { console.log('  （未找到演讲语料，先跑 python build_speech.py 和 node make_speech.js）'); }
 const mmss = s => {
   s = Math.max(0, Math.round(+s || 0));
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
@@ -110,6 +117,44 @@ Object.keys(L).forEach(id => {
   });
 });
 
+/* 读者问的词和原文常差几个字：问他「护城河」原文写「竞争优势」，
+   问他「伊藤忠商事」原文只写「伊藤忠」。这张表把读者用词映射到
+   原文可能用的说法，searchDocs 命中任一即可。改语料不用动这张表，
+   它解决的是「读者用词 vs 原文用词」的鸿沟，不是同义词召回。 */
+const ALIAS = {
+  '护城河': ['竞争优势', '护城河', '竞争壁垒', '可持续优势'],
+  '安全边际': ['安全边际', '边际'],
+  '内在价值': ['内在价值'],
+  '透视盈余': ['透视盈余', 'look-through'],
+  '浮存金': ['浮存金', '保险浮存金'],
+  '市场先生': ['市场先生'],
+  '能力圈': ['能力圈'],
+  '回购': ['回购', '购回'],
+  '子女教育': [],
+  '伊藤忠商事': ['伊藤忠'],
+  '科比吸尘器': ['科比'],
+  '威利家居': ['内布拉斯加家具店'],
+  '达美航空': ['达美'],
+  '美国合众银行': ['合众银行'],
+  '纽约梅隆银行': ['梅隆'],
+  '特许通讯': ['特许'],
+  '汉迪哈曼': ['汉迪哈曼'],
+  '科技与互联网': ['科技', '互联网', '亚马逊', '谷歌'],
+  '零售与消费': ['零售', '消费', '消费品牌'],
+  '媒体与出版': ['媒体', '出版', '华盛顿邮报'],
+  '他犯过哪些错误': [],   // 路由到 corrections 工具，硬检索没用
+  '他公开承认过什么': [],
+  '他后来改口过的事': [],
+  '他总结过什么教训': []
+};
+function expandQuery(q) {
+  let extras = [];
+  for (const k in ALIAS) {
+    if (q.indexOf(k) >= 0 && ALIAS[k].length) extras = extras.concat(ALIAS[k]);
+  }
+  return extras;
+}
+
 const TSTOP = '的了吗呢吧啊呀么怎你您我他她它这那有是会就要能可以什么为如何请告诉一下说说讲讲看想觉得把被让给对从到和与跟更最很太都也还又再就才只请您多少几个';
 function terms(q) {
   const out = [], seen = {};
@@ -142,6 +187,15 @@ function searchDocs(q, opts) {
   opts = opts || {};
   const ts = terms(q);
   if (!ts.length) return [];
+  /* 别名扩展：把读者用词对应的原文用词一并加入打分。
+     只增不替，免得原文用的就是「护城河」时反而被改写。 */
+  const extras = expandQuery(q);
+  const extraTerms = [];
+  for (const e of extras) {
+    const et = terms(e);
+    et.forEach(t => { if (!ts.some(x => x.g === t.g)) extraTerms.push(t); });
+  }
+  const allTerms = ts.concat(extraTerms);
   const N = DOCS.length, y0 = +opts.y0 || 0, y1 = +opts.y1 || 9999;
   const scored = [];
   for (let i = 0; i < N; i++) {
@@ -149,7 +203,7 @@ function searchDocs(q, opts) {
     if (d.y < y0 || d.y > y1) continue;
     const t = d.t;
     let s = 0;
-    for (const tm of ts) {
+    for (const tm of allTerms) {
       if (t.indexOf(tm.g) < 0) continue;
       let p = t.indexOf(tm.g), c = 0;
       while (p >= 0 && c < 4) { c++; p = t.indexOf(tm.g, p + tm.g.length); }
@@ -158,7 +212,7 @@ function searchDocs(q, opts) {
     }
     if (s <= 0) continue;
     s = s / (1 + Math.log(1 + t.length / 140));
-    if (/^[（(]\s*\d+\s*[)）]/.test(t) || !/[。！？…”」』]$/.test(t)) s *= 0.82;
+    if (/^[（(]\s*\d+\s*[)）]/.test(t) || !/[。！？…"」』]$/.test(t)) s *= 0.82;
     s += d.p * 0.35;
     scored.push({ i, s });
   }
@@ -208,7 +262,10 @@ function nowStamp() {
 }
 
 /* ---------------- 长期记忆 ---------------- */
+/* EVAL_NO_MEMORY=1 时返回空：评测跑批中每条问答不该读到上一条 remember 写的笔记，
+   否则 real-021 让它记住"海上风电检修排程"后，real-020 的答案会莫名其妙提检修排程。 */
 async function readMemory() {
+  if (process.env.EVAL_NO_MEMORY === '1') return { notes: [] };
   try { return JSON.parse(await fsp.readFile(MEM_FILE, 'utf8')) || { notes: [] }; }
   catch (e) { return { notes: [] }; }
 }
@@ -405,9 +462,38 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'speech_search',
+      description: '在 1985-2025 的大学演讲和媒体专访里找他说过的话（佛罗里达大学、斯坦福、圣母大学、北大、CNBC 专访等 21 个场合）。问「他对学生怎么说」「他在演讲里怎么讲这件事」「他接受采访时怎么说」时用这个。逐字稿可以引用，笔记转述的只能转述。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '要查的话题或说法' },
+          k: { type: 'integer', description: '可选，默认 4 条' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'remember',
       description: '把关于这位读者的重要信息长期记下来（背景、关注的公司、读信的目的、约定过的偏好），下回对话还记得。',
       parameters: { type: 'object', properties: { note: { type: 'string', description: '要记住的一句话，写清楚主语' } }, required: ['note'] }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'count_mentions',
+      description: '精确统计某个词或短语在全部信件原文里的出现次数与跨年分布。问「他提到X多少次」「X这个词出现过几十次吗」时必用这个，不要凭印象估数字。问次数之外的话题不要用它。',
+      parameters: {
+        type: 'object',
+        properties: {
+          term: { type: 'string', description: '要统计的词或短语，写他本人可能使用的中文说法' }
+        },
+        required: ['term']
+      }
     }
   }
 ];
@@ -679,6 +765,24 @@ async function toolCall(name, args, asOf) {
         sources: hits.filter(x => x.quote).map(x => ({ kind: 'letter', l: x.quote.l, b: x.quote.b, y: x.y })),
       };
     }
+    case 'speech_search': {
+      if (!SPEECH) return { text: '演讲语料没生成。先跑 python build_speech.py 和 node make_speech.js。' };
+      const hits = SPEECH.search(String(args.query || ''), { k: 12, year: YMAX })
+        .slice(0, Math.min(6, Math.max(1, +args.k || 4)));
+      if (!hits.length) return { text: '这些演讲和访谈里没找到相关段落。' };
+      const body = hits.map((x, i) =>
+        `[${i + 1}] ${x.y} 年${x.venue}${x.fid === 'notes' ? '（笔记转述）' : ''}\n` +
+        (x.ask ? `别人问：${x.ask}\n` : '') +
+        `他讲：${x.ans}`
+      ).join('\n\n');
+      const nNote = hits.filter(x => x.fid === 'notes').length;
+      return {
+        text: `【公开演讲与访谈原话 · ${nNote ? `其中 ${nNote} 条是笔记转述，不可逐字引用` : '均为逐字稿，可引用'}】\n${body}\n\n` +
+          `（以上来自 1985-2025 年的大学演讲和媒体专访，不是致股东信。引用时要把场合说清楚——` +
+          `对着学生讲的和写进给股东的信，分量不同。）`,
+        sources: [],
+      };
+    }
     case 'match_situation': {
       if (!SITUATION) return { text: '案例库没生成。先在项目根目录跑一次 node extract_cases.js。' };
       const r0 = SITUATION.match(String(args.query || ''), { k: Math.min(8, Math.max(1, +args.k || 5)) });
@@ -718,12 +822,49 @@ async function toolCall(name, args, asOf) {
     case 'remember': {
       const note = String(args.note || '').trim();
       if (!note) return { text: '没有内容可记。' };
+      if (process.env.EVAL_NO_MEMORY === '1') return { text: '记下了（评测模式不实际写入）：' + note };
       const m = await readMemory();
       m.notes = (m.notes || []).filter(n => n.text !== note);
       m.notes.push({ t: nowStamp(), text: note });
       while (m.notes.length > 60) m.notes.shift();
       await fsp.writeFile(MEM_FILE, JSON.stringify(m, null, 1), 'utf8');
       return { text: '记下了：' + note };
+    }
+    case 'count_mentions': {
+      /* 计数类断言必须由工具返回，模型不许估。问数就在这里数给他看。
+         同时把别名一起算进去——问他「护城河」多少次，原文实际写「竞争优势」。 */
+      const term = String(args.term || '').trim();
+      if (!term) return { text: '没给要统计的词。' };
+      const variants = [term].concat(ALIAS[term] || []);
+      const byYear = {};
+      let total = 0, letters = {};
+      for (const v of variants) {
+        for (let i = 0; i < DOCS.length; i++) {
+          const d = DOCS[i];
+          if (d.y > YMAX) continue;
+          let p = d.t.indexOf(v), c = 0;
+          while (p >= 0 && c < 200) { c++; p = d.t.indexOf(v, p + v.length); }
+          if (c > 0) {
+            byYear[d.y] = (byYear[d.y] || 0) + c;
+            letters[d.l] = (letters[d.l] || 0) + c;
+            total += c;
+          }
+        }
+      }
+      const years = Object.keys(byYear).sort();
+      const yr0 = years.length ? +years[0] : null, yr1 = years.length ? +years[+years.length - 1] : null;
+      /* overflow 是 build 时记的"提取超限被截断"次数，补进去免得少报 */
+      const of = C.overflow[term] || 0;
+      if (of) total += of;
+      const heads = Object.entries(letters).sort((a, b) => b[1] - a[1]).slice(0, 5)
+        .map(([l, c]) => `${l}（${c}次）`).join('、');
+      return {
+        text: `「${term}」${variants.length > 1 ? '及其同义说法（' + variants.slice(1).join('、') + '）' : ''}在全部信件原文里出现 ${total} 次` +
+          (years.length ? `，跨 ${yr0}-${yr1} 年（共 ${years.length} 年有提及）。` : '。') +
+          (of ? `\n（其中 ${of} 次是提取阶段超限被记入 overflow 字段，未单独成段。）` : '') +
+          (heads ? `\n出现最多的信：${heads}` : ''),
+        sources: []
+      };
     }
   }
   return { text: '没有这个工具：' + name };
@@ -800,7 +941,9 @@ ${stanceBlock}${mindBlock}
 2. 工具没给你原文，就不能说他讲过。宁可回答"这 ${C.meta.letters} 封信里没查到"，也不要替他把话补完。
 3. 每段原文证据后面都跟它的引用标记（形如 [[1988 巴菲特致股东信|12]] 或 [[web|网址]]），照抄工具输出，一个字都不要改。
 4. ${C.meta.years[1]} 年之后的事要用 web_search 查，答案里必须说清这是网络来源，不能和他信里写的话混在一起。
-5. 数字（回报率、价格、年份、持股比例）一律来自工具输出，不得推算拼凑。
+5. 数字（回报率、价格、年份、持股比例）一律来自工具输出，不得推算拼凑。被问到"X 出现了多少次""X 在多少封信里"这类次数题，必须先调 count_mentions 拿到精确数字再回答，不许凭印象估。
+6. 引号只用于逐字原文。引号里那一段必须能在原文里一字不差地找出来，否则不要用引号——你可以转述，但要让人看出来是转述，不要骗读者当成原话。
+7. 工具没查到、就是没查到。问"他对子女教育的看法"如果信里没说，就直说没说，不许拿别处谈"教育"的句子拼凑引申。
 ${voiceBlock(opts.noVoice)}
 ${BOUNDS}
 ${work}
@@ -932,6 +1075,7 @@ function toolSummary(name, args) {
     case 'stance_timeline': return '查「' + a.name + '」的立场演变';
     case 'talk_search': return '翻股东大会问答「' + a.query + '」';
     case 'remember': return '记下：' + a.note;
+    case 'count_mentions': return '数「' + a.term + '」出现多少次';
     default: return name;
   }
 }
@@ -1042,6 +1186,7 @@ async function runAgent(ctx) {
       }
       spans.push({ i: spans.length, type: 'tool', round: rounds, name: tc.name,
         args: argsObj, ms: Date.now() - ts0, out_chars: (res.text || '').length,
+        out: String(res.text || '').slice(0, 800),
         n_sources: (res.sources || []).length,
         error: /^工具出错/.test(res.text || '') ? (res.text || '').slice(0, 120) : null });
       const sources = (res.sources || []).filter(x => {

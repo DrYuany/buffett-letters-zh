@@ -91,6 +91,37 @@ function verdict(v, red) {
   L.push('```');
   L.push('');
 
+  /* 如果同目录里有上一轮的 score 文件，生成对照段：rb2 vs rb1。
+     改了提示词/工具后，单看一轮数没意义，要跟上一轮比才知道改对没改对。 */
+  const prevId = arg('prev');
+  if (prevId) {
+    let prev = null;
+    try { prev = JSON.parse(fs.readFileSync(path.join(RES_DIR, 'score-' + prevId + '.json'), 'utf8')); } catch (e) { }
+    if (prev && prev.agg) {
+      const pa = prev.agg;
+      const diff = (k) => {
+        const a0 = pa[k] && pa[k].rate, a1 = a[k] && a[k].rate;
+        if (a0 == null || a1 == null) return '—';
+        const d = +((a1 - a0) * 100).toFixed(1);
+        return (d > 0 ? '+' : '') + d + ' pp';
+      };
+      L.push('## 与 ' + prevId + ' 的对照');
+      L.push('');
+      L.push('| 指标 | ' + prevId + ' | ' + runId + ' | 变化 |');
+      L.push('|---|---|---|---|');
+      L.push('| 引用存在率 | ' + pct(pa.cite_exist && pa.cite_exist.rate) + ' | ' + pct(a.cite_exist && a.cite_exist.rate) + ' | ' + diff('cite_exist') + ' |');
+      L.push('| 逐字忠实率 | ' + pct(pa.verbatim && pa.verbatim.rate) + ' | ' + pct(a.verbatim && a.verbatim.rate) + ' | ' + diff('verbatim') + ' |');
+      L.push('| 数字溯源率 | ' + pct(pa.num_trace && pa.num_trace.rate) + ' | ' + pct(a.num_trace && a.num_trace.rate) + ' | ' + diff('num_trace') + ' |');
+      L.push('| judge ≥4 占比 | ' + pct(pa.judge_ge4) + ' | ' + pct(a.judge_ge4) + ' | ' + (a.judge_ge4 != null && pa.judge_ge4 != null ? (((a.judge_ge4 - pa.judge_ge4) * 100).toFixed(1) > 0 ? '+' : '') + ((a.judge_ge4 - pa.judge_ge4) * 100).toFixed(1) + ' pp' : '—') + ' |');
+      const dvf = (pa.verbatim && pa.verbatim.faithful || 0), dvp = (pa.verbatim && pa.verbatim.paraphrased || 0), dvx = (pa.verbatim && pa.verbatim.fabricated || 0);
+      const vf = (a.verbatim && a.verbatim.faithful || 0), vp = (a.verbatim && a.verbatim.paraphrased || 0), vx = (a.verbatim && a.verbatim.fabricated || 0);
+      L.push('| 引号分级（逐字/改写/编造） | ' + dvf + '/' + dvp + '/' + dvx + ' | ' + vf + '/' + vp + '/' + vx + ' | — |');
+      L.push('');
+      L.push('> 「pp」是百分点。这次改提示词（计数/引号/拒答）、加 count_mentions 工具、加别名表、修判分（工具返回的数字与年份算溯源）后的对比。');
+      L.push('');
+    }
+  }
+
   L.push('## 一、红线');
   L.push('');
   L.push('| 指标 | 实测 | 红线 | 判定 |');
