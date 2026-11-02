@@ -546,19 +546,40 @@ a.noyr{text-decoration:none;pointer-events:none}
 .msg.b .bubble blockquote{margin:9px 0;padding:9px 14px;background:var(--cream);
   border-left:3px solid var(--gold-light);border-radius:0 8px 8px 0;font-size:13.6px;line-height:1.85;color:#3A342B}
 .msg.b .bubble blockquote p{margin:0}
-.ct-cite{display:inline-block;font-size:11.5px;color:var(--gold);background:var(--accent-soft);
-  border:1px solid var(--border);border-radius:20px;padding:1px 9px;margin:0 2px;white-space:nowrap;
-  text-decoration:none;font-weight:600;line-height:1.6}
-.ct-cite:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
+/* 出处胶囊：一个小符号 + 一个短标签，点一下跳回原文。
+   符号按来源类别分（股东信/合伙人信/演讲访谈/致辞/网页/案例），颜色也跟着走，
+   读者扫一眼就知道这句话是从哪儿来的，不用先读一堆字。 */
+.ct-cite{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:var(--gold);
+  background:var(--accent-soft);border:1px solid var(--border);border-radius:20px;
+  padding:2px 10px 2px 8px;margin:0 2px;white-space:nowrap;text-decoration:none;
+  font-weight:600;line-height:1.55;vertical-align:1px;
+  transition:transform .16s ease,box-shadow .16s ease,background .16s ease,color .16s ease}
+.ct-cite .cic{font-size:12.5px;line-height:1;display:inline-block;
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1);transform-origin:50% 60%}
+.ct-cite .cn{letter-spacing:.2px}
+.ct-cite:hover{transform:translateY(-1.5px);box-shadow:0 4px 12px rgba(27,27,24,.10)}
+.ct-cite:hover .cic{transform:scale(1.22) rotate(-8deg)}
+.ct-cite:active{transform:translateY(0) scale(.97)}
 .ct-cite.ct-web{background:#EEF4FB;border-color:#CFE0F5;color:#2B5E9E}
-.ct-cite.ct-web:hover{background:#2B5E9E;color:#fff}
+.ct-cite.ct-web:hover{box-shadow:0 4px 12px rgba(43,94,158,.16)}
+.ct-cite.ct-partner{background:#EDF7F0;border-color:#CFE8D9;color:#2E7D4F}
+.ct-cite.ct-partner:hover{box-shadow:0 4px 12px rgba(46,125,79,.16)}
+.ct-cite.ct-speech{background:#F5EFFA;border-color:#E2D3F0;color:#6B4794}
+.ct-cite.ct-speech:hover{box-shadow:0 4px 12px rgba(107,71,148,.16)}
+.ct-cite.ct-memo{background:#FDF3E3;border-color:#F0DCB4;color:#8A5A1A}
+.ct-cite.ct-memo:hover{box-shadow:0 4px 12px rgba(138,90,26,.16)}
+.ct-cite.ct-case{background:#EAF6F6;border-color:#CBE7E7;color:#206B6B}
+.ct-cite.ct-other{background:#F4F1EC;border-color:#E3DCD0;color:#6B6560}
 .tp-meta{margin-top:7px;font-size:11px;color:var(--ink3)}
 .tp-h{font-weight:700;color:var(--text);margin-top:12px}
 .tp-srcs{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11.8px;color:var(--ink3)}
 .tp-srcs b{display:block;color:var(--ink2);font-weight:600;margin-bottom:4px;font-size:11.5px}
-.tp-srcs a{display:block;color:var(--gold);text-decoration:none;line-height:1.8;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.tp-srcs a:hover{text-decoration:underline}
+.tp-srcs a{display:flex;align-items:center;gap:5px;color:var(--gold);text-decoration:none;line-height:1.85;
+  border-radius:6px;padding:0 4px;margin-left:-4px;transition:background .15s ease,transform .15s ease}
+.tp-srcs a .cic{flex:0 0 auto;font-size:12.5px;line-height:1;transition:transform .2s ease}
+.tp-srcs a .tx{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-srcs a:hover{text-decoration:none;background:var(--accent-soft);transform:translateX(2px)}
+.tp-srcs a:hover .cic{transform:scale(1.18) rotate(-6deg)}
 .tp-state{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
   padding:3px 10px;border-radius:20px;margin-left:10px;vertical-align:middle}
 .tp-state.on{background:#EAF6EE;color:#2E7D4F;border:1px solid #CFE8D9}
@@ -613,6 +634,8 @@ a.noyr{text-decoration:none;pointer-events:none}
 @media(max-width:520px){
   .tp-event{grid-template-columns:1fr}
   .tp-opts{gap:9px}
+  .ct-cite{font-size:10.8px;padding:1px 8px 1px 6px;gap:3px}
+  .ct-cite .cic{font-size:11.5px}
 }
 
 /* ===== 响应式 ===== */
@@ -1966,25 +1989,57 @@ function talkMsgs(){
   }).join('');
 }
 
-/* 回答里的行内标记：[[1964 巴菲特致合伙人信|101]] 变成能点回原文的胶囊，
-   [[web|网址]] 变成网络来源胶囊。引文用 > 起头，加粗用 **。 */
-function fmtCite(s){
-  return s.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, function(all, a, b){
-    if (a === 'web') return '<a class="ct-cite ct-web" href="' + b.replace(/&amp;/g, '&') +
-      '" target="_blank" rel="noopener">网络来源 ↗</a>';
-    var y = (a.match(/\d{4}/) || [''])[0];
-    return '<a class="ct-cite" href="#/l/' + encodeURIComponent(a) + '?b=' + encodeURIComponent(b) + '">' +
-      y + ' 年 · 读原文 ↗</a>';
-  }).replace(/〔([A-Za-z0-9\u4e00-\u9fa5\-_]+)〕/g, '<span class="tp-case">$1</span>');
+/* 回答里的行内标记：[[1964 巴菲特致合伙人信|101]] 变成一个能点回原文的小符号胶囊，
+   [[web|网址]] 变成网页胶囊。符号按来源类别分，服务端下发的 cites 优先，本地表兜底。
+   引文用 > 起头，加粗用 **。 */
+var CITE_LOOK = [
+  [/^web$/, 'web', '🌐', '网页'],
+  [/^(sc-|rule-|corr-)/, 'case', '🎬', '案例'],
+  [/致合伙人信/, 'partner', '🤝', '合伙人信'],
+  [/致股东信|致股东的信/, 'letter', '📜', '致股东信'],
+  [/股东大会|年会|演讲|访谈|对话|问答/, 'speech', '🎤', '演讲'],
+  [/致辞|短文|序言|过去现在与未来|副董事长的思考/, 'memo', '📝', '短文']
+];
+function citeLook(a, cmap){
+  var hit = cmap && cmap[a];
+  if (hit) return hit;
+  for (var i = 0; i < CITE_LOOK.length; i++){
+    if (CITE_LOOK[i][0].test(a)) return { k: CITE_LOOK[i][1], icon: CITE_LOOK[i][2], name: CITE_LOOK[i][3] };
+  }
+  return { k: 'other', icon: '🔖', name: '资料' };
 }
-function fmtAns(t){
+/* 服务端给的是 [{key:'[[信|段]]', k, icon, name}]，转成按标记查的字典 */
+function citeMap(list){
+  var map = null;
+  (list || []).forEach(function(c){ if (c && c.key){ (map = map || {})[c.key] = c; } });
+  return map;
+}
+function fmtCite(s, cmap){
+  return s.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, function(all, a, b){
+    var look = (cmap && cmap[all]) || citeLook(a);
+    if (a === 'web'){
+      var url = b.replace(/&amp;/g, '&');
+      var host = '';
+      try { host = url.split('/')[2] || ''; } catch (e) {}
+      return '<a class="ct-cite ct-web" href="' + url + '" target="_blank" rel="noopener"' +
+        ' title="网页' + (host ? '：' + esc(host) : '') + '（点开在新标签页看）">' +
+        '<span class="cic">' + (look.icon || '🌐') + '</span><span class="cn">网页</span></a>';
+    }
+    var y = (a.match(/\d{4}/) || [''])[0];
+    var txt = y || look.name || '资料';
+    return '<a class="ct-cite ct-' + (look.k || 'other') + '" href="#/l/' + encodeURIComponent(a) + '?b=' + encodeURIComponent(b) + '"' +
+      ' title="' + esc(a) + ' · 第 ' + esc(b) + ' 段（点开读原文）">' +
+      '<span class="cic">' + (look.icon || '🔖') + '</span><span class="cn">' + esc(txt) + '</span></a>';
+  }).replace(/〔([A-Za-z0-9\u4e00-\u9fa5\-_]+)〕/g, '<span class="tp-case">🎬 $1</span>');
+}
+function fmtAns(t, cmap){
   var out = '', quote = false;
   String(t).split('\n').forEach(function(ln){
     var s = ln.replace(/\s+$/, '');
     if (/^\s*>\s?/.test(s)){
       if (!quote){ out += '<blockquote>'; quote = true; }
       else out += '<br>';
-      out += fmtCite(esc(s.replace(/^\s*>\s?/, '')));
+      out += fmtCite(esc(s.replace(/^\s*>\s?/, '')), cmap);
       return;
     }
     if (quote){ out += '</blockquote>'; quote = false; }
@@ -1994,25 +2049,40 @@ function fmtAns(t){
     var head = /^#{1,4}\s?/.test(tr);
     if (head) tr = tr.replace(/^#{1,4}\s?/, '');
     if (/^[-*]\s/.test(tr)) tr = tr.replace(/^[-*]\s/, '· ');
-    var line = fmtCite(esc(tr)).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    var line = fmtCite(esc(tr), cmap).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
     out += head ? '<p class="tp-h">' + line + '</p>' : '<p>' + line + '</p>';
   });
   if (quote) out += '</blockquote>';
   return out;
 }
-/* 分身答案按两个固定标题切成两区：原话能点回原信，推演明确标成模拟。
-   模型偶尔不按格式写就原样显示，别让读者看到半截 HTML。 */
-var SIM_H1 = '【他确实说过】', SIM_H2 = '【按这些依据推演】';
-function fmtSim(t){
+/* 分身答案按固定标题分段：原话单独一区（能点回原信），研判主体一区（明确标成模拟）。
+   模型写标题的花样不少——【他确实说过】、〔他确实说过〕、**〔他确实说过〕**，
+   所以先把这几种写法归一，再按标题切段；一个标题都没认出来就原样显示。
+   每条判断都要求带数字和可证伪点，这里只负责排版，不替它补内容。 */
+var SIM_HEADS = ['他确实说过', '现在的事实', '我怎么量它', '所以', '我可能错在哪', '按这些依据推演'];
+function fmtSim(t, cmap){
   var s0 = String(t || '');
-  var a = s0.indexOf(SIM_H1), b = s0.indexOf(SIM_H2);
-  if (a < 0 || b < 0 || b < a) return fmtAns(s0);
-  var q = s0.slice(a + SIM_H1.length, b), s = s0.slice(b + SIM_H2.length);
-  return '<div class="tp-zone"><div class="tp-zone-h">他确实说过 · 可点回原信</div>' + fmtAns(q) + '</div>' +
-    '<div class="tp-zone tp-zone-sim"><div class="tp-zone-h">按这些依据推演 · 模拟，不是他的原话</div>' + fmtAns(s) + '</div>';
+  var alt = SIM_HEADS.join('|');
+  var norm = s0.replace(new RegExp('\\*{0,2}[〔【]\\s*(' + alt + ')\\s*[〕】]\\*{0,2}', 'g'), '【$1】');
+  var re = new RegExp('【\\s*(' + alt + ')\\s*】', 'g');
+  var ms = [], m;
+  while ((m = re.exec(norm))) ms.push({ name: m[1], at: m.index, end: m.index + m[0].length });
+  if (!ms.length) return fmtAns(norm, cmap);
+  var pre = norm.slice(0, ms[0].at).trim();
+  var quote = '', body = '';
+  ms.forEach(function(x, i){
+    var seg = norm.slice(x.end, i + 1 < ms.length ? ms[i + 1].at : norm.length).trim();
+    if (x.name === '他确实说过' && !quote) quote = seg;
+    else body += '<p class="tp-h">' + x.name + '</p>' + fmtAns(seg, cmap);
+  });
+  var out = pre ? fmtAns(pre, cmap) : '';
+  if (quote) out += '<div class="tp-zone"><div class="tp-zone-h">他确实说过 · 可点回原信</div>' + fmtAns(quote, cmap) + '</div>';
+  if (body) out += '<div class="tp-zone tp-zone-sim"><div class="tp-zone-h">按他的旧判断推演 · 模拟，不是他的原话</div>' + body + '</div>';
+  return out || fmtAns(norm, cmap);
 }
 function fmtBody(m){
-  return (m && m.sim) ? fmtSim(m.raw || '') : fmtAns((m && m.raw) || '');
+  var cmap = citeMap(m && m.cites);
+  return (m && m.sim) ? fmtSim(m.raw || '', cmap) : fmtAns((m && m.raw) || '', cmap);
 }
 
 /* 花了多少、查了几轮，摆在答案底下：接的是要花钱的模型，读者有权知道 */
@@ -2026,14 +2096,17 @@ function fmtMeta(m){
 }
 function fmtSrcs(list){
   if (!list || !list.length) return '';
-  return '<div class="tp-srcs"><b>这一答引用的出处（' + list.length + ' 条）</b>' +
+  return '<div class="tp-srcs"><b>🧾 这一答翻过的材料 · ' + list.length + ' 处</b>' +
     list.map(function(s){
       if (s.kind === 'letter'){
-        return '<a href="#/l/' + encodeURIComponent(s.l) + '?b=' + s.b + '">' + s.y + ' 年 · ' + esc(s.l) + ' 第 ' + s.b + ' 段</a>';
+        var look = citeLook(s.l);
+        return '<a href="#/l/' + encodeURIComponent(s.l) + '?b=' + s.b + '">' +
+          '<span class="cic">' + look.icon + '</span><span class="tx">' + s.y + ' 年 · ' + esc(s.l) + ' 第 ' + s.b + ' 段</span></a>';
       }
       var host = '';
       try { host = s.url.split('/')[2] || ''; } catch (e) {}
-      return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">网络 · ' + esc(host) + ' — ' + esc(String(s.title || '').slice(0, 46)) + '</a>';
+      return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' +
+        '<span class="cic">🌐</span><span class="tx">网页 · ' + esc(host) + ' — ' + esc(String(s.title || '').slice(0, 46)) + '</span></a>';
     }).join('') + '</div>';
 }
 
@@ -2198,7 +2271,8 @@ function talkPage(){
       '</div>' : '') +
     '</div>' +
     '<p class="tp-note">回答基于巴菲特公开信件整理，不构成任何投资建议。' +
-      '分身模式会把「他确实说过」与「按这些依据推演」分开，推演不是他的原话。' +
+      '问「他当年怎么说」只翻原文逐字答；问「这家公司现在怎么样」会去调实时行情和三季报，' +
+      '按他的旧判断给一个明确立场，并标出什么情况会让他改口。研判部分是模拟，不是他的原话。' +
       (online ? '每条引文都能点回原信。' : '离线模式只在字面上匹配原文，不含推理。') + '</p>' +
     '<p class="tp-mem">他会慢慢记住你是谁、关心什么（存在本机的 agent-memory.json 里）· ' +
       '<button id="talk-forget">让他忘掉关于我的一切</button></p>' +
@@ -2358,7 +2432,7 @@ function talkEvent(ev, d, idx){
   if (ev === 'step'){ m.steps.push(d.text); talkPaint(idx); }
   else if (ev === 'delta'){ m.raw += d.text; talkPaint(idx); }
   else if (ev === 'reset'){ m.raw = ''; talkPaint(idx); }   // 这一轮它改主意去查工具了，刚才那半句不算答案
-  else if (ev === 'sources'){ m.sources = d.sources || []; talkPaint(idx); }
+  else if (ev === 'sources'){ m.sources = d.sources || []; m.cites = d.cites || []; talkPaint(idx); }
   else if (ev === 'quota'){ TM.free = d.left; if (d.total) TM.total = d.total; talkUpdateState(); }
   else if (ev === 'note'){ m.note = d.text; }
   else if (ev === 'error'){

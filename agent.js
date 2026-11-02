@@ -78,6 +78,12 @@ if (!MEETING && !TALK) console.log('  （两种股东大会语料都没有，先
 let SPEECH = null;
 try { SPEECH = require('./speech'); }
 catch (e) { console.log('  （未找到演讲语料，先跑 python build_speech.py 和 node make_speech.js）'); }
+
+/* 结构化行情与财报：回答「今天这家公司怎么样」时，光有历史框架不够，
+   得有现价、PE、营收增速这些能写进句子的东西。拿不到就如实说拿不到。 */
+let MARKET = null;
+try { MARKET = require('./market'); }
+catch (e) { console.log('  （market.js 没加载：现价/财报类问题只能联网搜）'); }
 const mmss = s => {
   s = Math.max(0, Math.round(+s || 0));
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
@@ -504,6 +510,49 @@ const TOOLS = [
         required: ['term']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'market_snapshot',
+      description: '拿 A 股标的的确切数字：最新价、涨跌幅、总市值、PE、PB、近五年价格分位，以及最近四期财报（营收、净利、各自同比、毛利率、ROE）。给指数名（沪深300、中证白酒、创业板指等）则返回它的 PE/PB 和历史分位。回答任何「现在贵不贵 / 最近怎么样 / 值不值得买 / 怎么看这家公司」之前，必须先调这个拿数。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '公司名、股票代码或指数名，例如「贵州茅台」「600519」「沪深300」' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'market_news',
+      description: '搜最近的 A 股财经资讯和公司公告（中文财经媒体，带日期和出处）。回答「最近发生了什么」「为什么涨/跌」「三季报出了什么」时用这个，比通用网页搜索准。返回可能有噪音，挑真正相关的用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '公司名或行业名，再加一两个限定词，例如「贵州茅台 批价 库存」' },
+          k: { type: 'integer', description: '可选，要几条，默认 5' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'peer_compare',
+      description: '一次比多只 A 股的估值和增长，用来回答「它比同行贵不贵」。给 2 到 5 个公司名或代码。返回每家的现价、市值、PE、PB、涨跌幅。',
+      parameters: {
+        type: 'object',
+        properties: {
+          names: { type: 'array', items: { type: 'string' }, description: '要对比的公司名或代码，2-5 个' }
+        },
+        required: ['names']
+      }
+    }
   }
 ];
 
@@ -869,6 +918,67 @@ async function toolCall(name, args, asOf) {
       await fsp.writeFile(MEM_FILE, JSON.stringify(m, null, 1), 'utf8');
       return { text: '记下了：' + note };
     }
+    case 'market_snapshot': {
+      /* 实时行情只在「今天」这个视角下有意义。回测模式拉到的是未来数据，
+         会把答案直接喂给模型，所以这里必须硬拦。 */
+      if (YMAX < 9999) return { text: '回测模式下不拉实时行情：那是今天的数据，会泄漏答案。' };
+      if (!MARKET) return { text: '行情模块没加载（market.js）。先确认文件在项目根目录。' };
+      const q = String(args.query || '').trim();
+      if (!q) return { text: '没给公司名或代码。' };
+      let r;
+      try { r = await MARKET.snapshot(q); }
+      catch (e) { return { text: '行情接口没通：' + e.message + '。可以改用 web_search 查，但必须说明是网络来源。' }; }
+      if (!r.ok) {
+        const cand = (r.cand || []).map(x => `${x.name}（${x.code}）`).join('、');
+        return {
+          text: `没拿到「${q}」的数据：${r.err}` +
+            (cand ? `\n可能是想找：${cand}。确认是哪一个再调一次。` : '') +
+            '\n不要用记忆里的数字顶替，可以在正文里说明这个数没拿到。'
+        };
+      }
+      const tail = r.kind === 'index'
+        ? '\n（来源：蛋卷指数估值，分位是过去十年的位置。数字照抄，不要自己换算或推算。）'
+        : '\n（来源：东方财富行情与定期报告。A 股财报是年初至今的累计口径。数字照抄，不要自己换算或推算。）';
+      return { text: r.text + tail };
+    }
+    case 'market_news': {
+      if (YMAX < 9999) return { text: '回测模式下不能看新闻：那是今天以后的报道。' };
+      if (!MARKET) return { text: '行情模块没加载（market.js）。' };
+      const kw = String(args.query || '').trim();
+      if (!kw) return { text: '没给搜索词。' };
+      const n = Math.min(8, Math.max(2, +args.k || 5));
+      let list;
+      try { list = await MARKET.news(kw, n); }
+      catch (e) { return { text: '资讯接口没通：' + e.message + '。可以改用 web_search。' }; }
+      if (!list.length) return { text: `没搜到「${kw}」相关的资讯。换个说法，或者只用财报数据回答。` };
+      const body = list.map((x, i) =>
+        `[${i + 1}] ${x.date}　${x.media}\n${x.title}\n${x.content}`).join('\n\n');
+      return {
+        text: `【财经资讯 · 网络来源，只能当背景，不是他的话】\n${body}\n\n` +
+          `（新闻稿可能有噪音，也有写错的时候。引用要带媒体名和日期；别拿一条新闻稿当立论的核心证据，` +
+          `核心证据用财报数字。以上没有一条能进「他确实说过」那一区。）`
+      };
+    }
+    case 'peer_compare': {
+      if (YMAX < 9999) return { text: '回测模式下不拉实时行情。' };
+      if (!MARKET) return { text: '行情模块没加载（market.js）。' };
+      const names = (Array.isArray(args.names) ? args.names : []).map(s => String(s).trim()).filter(Boolean);
+      if (names.length < 2) return { text: '至少给两个名字才能对比。' };
+      const rows = await MARKET.compare(names);
+      const lines = rows.map(r => {
+        if (!r.ok) return `- ${r.query}：没拿到（${r.err}）`;
+        const q = r.quote;
+        const unit = q.cur === 'USD' ? '美元' : q.cur === 'HKD' ? '港元' : '元';
+        return `- ${q.name}（${q.code}）：${q.price.toFixed(2)} ${unit}，当日 ${MARKET.pctText(q.chgPct)}` +
+          `，市值 ${MARKET.bigMoney(q.mcap, q.cur)}` +
+          `，PE ${q.pe !== null && q.pe > 0 ? q.pe.toFixed(1) + ' 倍' : '—'}` +
+          `，PB ${q.pb !== null && q.pb > 0 ? q.pb.toFixed(2) + ' 倍' : '—'}`;
+      });
+      return {
+        text: `同行对比（${rows[0] && rows[0].at ? rows[0].at : ''}，同一时点）：\n${lines.join('\n')}\n` +
+          '（只看估值高低不够，要结合增速和毛利率说，那些数用 market_snapshot 单个查。）'
+      };
+    }
     case 'count_mentions': {
       /* 计数类断言必须由工具返回，模型不许估。问数就在这里数给他看。
          同时把别名一起算进去——问他「护城河」多少次，原文实际写「竞争优势」。 */
@@ -942,35 +1052,58 @@ function systemPrompt(memNotes, mode, opts) {
   if (mode === 'simulate') {
     return `你是${NAME}的虚拟化身。今天是 ${today}。桌上摊着 ${about}，另有 ${SITUATION ? SITUATION.CASES.length : 0} 条整理好的历史决策案例，只有工具能翻开给你看。${cutoff}
 
-读者会告诉你今天发生的一件事（A 股的公司或市场），问「你会怎么想」。用第一人称「我」回答，像本人坐在桌边说话，平静、具体、不夸张。
+读者会拿今天 A 股的一件事问你——一家公司、一个指数、一条新闻。他要的不是「如果是你会怎么看」的空话，是你真坐下来翻过财报、算过价格之后会给出的那个判断。用第一人称「我」回答，平静、具体、不夸张。
 
-【最重要的规矩：答案必须分成两区，一个字都不许混】
-严格按下面两个标题输出，顺序不能变，标题各占一行：
+【先拿数，再开口】
+你手上没有今天的行情和财报，凭印象说数字是最丢人的错。开口之前按这个顺序查：
+1. market_snapshot —— 现价、涨跌幅、市值、PE、PB、近五年价格分位，以及最近四期营收、净利、各自同比、毛利率、ROE。问的是指数就传指数名，它会返回 PE/PB 的历史分位。
+2. match_situation —— 把这件事对到旧判断，拿到「尺子」，不是拿答案。
+3. 想知道最近发生了什么（批价、库存、政策、事故、并购、业绩预告、管理层变动、监管处罚），用 market_news 搜公司名或行业名——中文财经资讯比通用搜索准。它和财报要分开说：财报是事实，资讯是别人写的。
+4. 想说「它比同行贵」，必须先 peer_compare，没有参照物就没有贵不贵。
+第一轮就把这几个并行发起。数据没拿到，就在正文里明说这个数没拿到，绝不用记忆里的数字顶上。
+
+【五段，标题照抄，各占一行】
 【他确实说过】
-【按这些依据推演】
+只放工具返回里逐字不改的原话，每句后跟 [[信|段]]。没有就写「这些信里没查到直接对应的原话」。这一区最多三句，不要拿它占篇幅。
 
-第一区只放工具返回里逐字不改的我的原话，每句后面照抄工具给的引用标记 [[信|段]]。工具没给原话，这一区就写「这些信里没查到直接对应的原话」，绝不替我补一句。
-第二区才是我面对今天这件事的推演。在这一区里：
-- 不许出现任何 [[...]] 引用标记，不许用引号引我的原话，不许写「我说过」「我在某年写过」这种冒充原话的句式；
-- 推演要标出它依据了哪几条历史案例，用 〔案例id〕 这个格式（id 来自 match_situation / case_detail，至少标 2 条）；
-- 标了「⚠ 反向对照」的案例只能拿来对比，不能当成本次判断的依据，要说明它相反在哪；
-- 今天的事实只来自读者给的事件描述或工具返回，不许自己编发生了什么，也不许编股价、数字、公司名；
-- 收尾用一句话说清「这是按旧判断推的，不是我对今天这件事的承诺」。
+【现在的事实】
+3 到 6 条，每条一个数字或一件已发生的事，必须带日期或报告期。
+像这样写：2026 年三季报营收 1332.8 亿元、同比 +1.8%；净利 644.7 亿元、同比 -0.3%；毛利率 89.6%；当前 PE 20.9 倍，处在近五年价格的 45% 分位。
+不许写「业绩承压」「估值处于低位」「行业景气度上行」这类没有数字的判断句——那是把结论当事实。
+
+【我怎么量它】
+2 到 4 个角度。每个角度写三样东西，缺一不可：
+（一）尺子：这条判断标准从哪条旧判断来的——标 〔案例id〕，或者直接标 [[信|段]]，两种都行，但必须是工具真返回过的；再用一句话说清那把尺子量的是什么；
+（二）数字：这把尺子量在这家公司身上，读数是多少；
+（三）判断：这个读数说明生意变好了还是变坏了。
+一个角度写完再写下一个，不要揉成一大段。示范：
+- 提价能力（〔case_xxx〕）：毛利率 89.6%，五年没掉下过 88%，说明提价没把经销商逼走。但营收只增 1.8%，量已经不动了，增长只剩提价一条腿。这是好生意变钝，不是变坏。
+- 资本消耗（〔case_yyy〕）：营收增 56%，资本开支同期增多少、负债率有没有升，直接决定这增长是白赚的还是买来的。
+
+【所以】
+一句明确的话：买、不买、等，或者「看不懂，不碰」。不许「因人而异」「需要综合考虑」「建议关注」。
+说看不懂就要说清看不懂的是哪一件事——不是「行业太复杂」，是「我算不出它三年后还能不能继续提价」。
+
+【我可能错在哪】
+一条最可能错的地方，具体到能被人当面反驳；再加一个可观察的证伪点：
+「如果下季度毛利率跌破 85%，我上面那条就作废。」
 
 【其他铁律】
-1. 数字、年份、价格一律来自工具输出，不得推算拼凑。
-2. ${C.meta.years[1]} 年之后的事要用 web_search 查，答案里必须说清这是网络来源，不能和我信里的话混在一起。
-3. 遇到「明天涨不涨」「给我一个代码」这类，按我自己说过的规矩拒绝预测和荐股。但读者问「这件事你怎么看、你会怎么做」，那是另一回事：必须给一个明确立场——买、不买、还是等——不许拿「我不预测」当挡箭牌蒙过去。他一辈子拒的是预测大盘和短期走势，从来不是拒绝就一家公司给出判断。能力圈内、价格合适的时候，他敢把话说得很硬。
-4. 工具返回里标了「概述，不可逐字引用」的文字，只能用来理解情形，不能当原话。
-5. 两区合计 600-900 字，宁短勿长；第一区宁可只有一两句，也不要拿概述凑数。
+1. 每个数字都必须来自工具输出，包括年份、价格、百分比、倍数。不许推算，不许凭印象，不许拿常识补。
+2. 只在【他确实说过】里用引号引他的话。其余地方不许用引号，不许写「我说过」「我在某年写过」——标 〔案例id〕 就够了。
+3. 标了「⚠ 反向对照」的案例只能拿来对比，要说明它相反在哪，不能当本次判断的依据。
+3b. 如果 match_situation 返回的全是「原则」而没有具体决策，就在那个角度上明说「这是原则，不是某次具体决策」，不要把它包装成一次先例。
+4. 读者问「明天涨不涨」「给我一个代码」「现在满仓行不行」，照样拒绝——那是预测和荐股。但问「这家公司怎么样」「现在值不值得买」，那是判断，必须给明确立场。他一辈子拒的是预测大盘和短期走势，从不拒绝对一家公司下判断。
+5. 工具返回里标了「概述，不可逐字引用」的文字，只能用来理解情形，不能当原话。
+6. 全文 800-1100 字。【我怎么量它】不能少于两个角度。写不下时先砍【他确实说过】，再砍【我可能错在哪】的铺垫，保住事实和角度。
 ${voiceBlock(opts.noVoice)}
 ${BOUNDS}
 ${work}
-- 第一轮先调 match_situation（把今天这件事对到旧判断），同时并行发起可能用得上的 search_letters / concept_profile。想细看某条旧案例就调 case_detail。
+- 第一轮并行发起：market_snapshot（拿数）+ match_situation（拿尺子）。需要同行参照就补 peer_compare，事情有近期进展就补 web_search。
 
 ${reader}
 ${stanceBlock}${mindBlock}
-记住：第二区是模拟推演，不是我说过的话。页面会替你标注这一点，但你自己也不许把两区搅在一起。`;
+最后一句必须说清：这是按旧判断推的，不是我对今天这件事的承诺。`;
   }
 
   return `你是「巴菲特午餐会」的主持人。桌上摊着 ${about}，只有工具能把它翻开给你看。
@@ -1005,6 +1138,7 @@ ${reader}
    让推演好看而扭曲判断。分开调，主回答只拿结论，不拿过程。 */
 const MINDSET_Q = [
   '这件事落在我的能力圈里吗？如果不在，我该承认到什么程度？',
+  '要判断这件事，我需要哪几个具体数字？现在我知道哪些，缺哪些？缺的该去哪儿拿？',
   '护城河有没有真的被改变，还是只是价格在动？',
   '管理层和资本配置这一层，有没有出现我无法信任的迹象？',
   '价格相对内在价值在什么位置？我有没有在用"便宜"掩盖"看不懂"？',
@@ -1118,6 +1252,9 @@ function toolSummary(name, args) {
     case 'talk_search': return '翻股东大会问答「' + a.query + '」';
     case 'remember': return '记下：' + a.note;
     case 'count_mentions': return '数「' + a.term + '」出现多少次';
+    case 'market_snapshot': return '调行情和财报「' + a.query + '」';
+    case 'peer_compare': return '对比 ' + (a.names || []).join(' / ');
+    case 'market_news': return '搜最近的资讯「' + a.query + '」';
     default: return name;
   }
 }
@@ -1182,7 +1319,7 @@ async function runAgent(ctx) {
   };
 
   for (rounds = 1; rounds <= MAX_ROUNDS; rounds++) {
-    const payload = { model, messages: history, tools, stream: true, max_tokens: 2400, temperature: 0.3 };
+    const payload = { model, messages: history, tools, stream: true, max_tokens: 4096, temperature: 0.3 };
     /* 一边收 token 一边发给前端；万一这一轮改主意要去调工具，
        说明开头那半句话是"我来查查"之类的过场，用 reset 让前端把它抹掉。 */
     const acc = await streamChat(payload, apiKey, onDelta);
@@ -1246,7 +1383,7 @@ async function runAgent(ctx) {
   if (!final) {
     /* 循环用尽还没张口：逼它把已经查到的东西说完 */
     history.push({ role: 'user', content: '（工具额度已用尽，请立刻基于你手上的原文作答，并附上引用标记）' });
-    const acc = await streamChat({ model: model, messages: history, stream: true, max_tokens: 2400, temperature: 0.3 }, apiKey, onDelta);
+    const acc = await streamChat({ model: model, messages: history, stream: true, max_tokens: 4096, temperature: 0.3 }, apiKey, onDelta);
     spans.push({ i: spans.length, type: 'llm', round: rounds, forced: true, ms: acc.ms, ttft: acc.ttft,
       finish: acc.finish, prompt_tokens: (acc.usage || {}).prompt_tokens || 0,
       completion_tokens: (acc.usage || {}).completion_tokens || 0,
@@ -1278,7 +1415,7 @@ async function runAgent(ctx) {
     const key = x.kind === 'letter' ? '[[' + x.l + '|' + x.b + ']]' : '[[web|' + x.url + ']]';
     return text.indexOf(key) >= 0;
   });
-  emit('sources', { sources: used });
+  emit('sources', { sources: used, cites: citeBag(text) });
   if (final.truncated) emit('note', { text: '这次回答撞到了长度上限，可能没说完 —— 可以让它接着问，或换个更窄的问题。' });
 
   s.msgs.push({ role: 'assistant', content: final.content });
@@ -1385,6 +1522,21 @@ function appendTrace(rec) {
   return _traceQ;
 }
 function hashId(s) { return crypto.createHash('sha256').update(String(s || '')).digest('hex').slice(0, 16); }
+/* 问题分诊：这个产品只有两类问题——问过去，和问今天。
+   读者不该记哪个按钮对应哪类：问「他当年怎么说」就翻信逐字答，
+   问「这家公司现在怎么样」就该拿行情财报做研判，硬翻旧信只会答非所问。
+
+   规则只做粗筛，判不准时偏向 archive —— 那条路走不通会明说「信里没查到」，
+   不会编数字；反过来把考据题当研判，就会拿今天的数据去回答一个历史问题。 */
+function triageMode(message, mode) {
+  const msg = String(message || '');
+  const askPast = /(他说过|他讲过|他提过|信里|原话|哪一年|哪封信|怎么说的|有没有提过|写过什么|提过几次)/.test(msg);
+  const askNow = /(现在|目前|最近|今年|今天|当下|这会儿|该不该买|值不值|能不能买|能不能持有|贵不贵|便宜吗)/.test(msg);
+  const askView = /(你|您)怎么(看|想)|你会怎么做|换成你|如果是你/.test(msg);
+  if (mode === 'simulate') return (askPast && !askNow && !askView) ? 'archive' : 'simulate';
+  if (askPast) return 'archive';
+  return (askNow || askView) ? 'simulate' : 'archive';
+}
 /* 答案里的引用标记 [[信|段]] / [[web|url]] —— 判「引用存不存在」就从这里下手。
    注意「信」那一截是信件 id（形如「2018 巴菲特致股东信」），不是数字下标。 */
 const CITE_RE = /\[\[([^|\]]+)\|(\d+)\]\]|\[\[web\|([^\]]+)\]\]/g;
@@ -1393,6 +1545,58 @@ function parseCites(text) {
   CITE_RE.lastIndex = 0;
   while ((m = CITE_RE.exec(text))) {
     out.push(m[3] !== undefined ? { kind: 'web', url: m[3] } : { kind: 'letter', l: m[1], b: +m[2] });
+  }
+  return out;
+}
+
+/* 引用胶囊的“长相”：类别、符号、名字都在这里定，前端只管照着画。
+   标记本身仍然是 [[信|段]] / [[web|url]]，一个字都不改 —— 判分器和旧 trace 都认这个格式。
+   分不出类别的走 other，绝不因为猜类别而丢掉一条引用。 */
+const CITE_KINDS = {
+  letter:  { icon: '📜', name: '致股东信', cls: 'letter' },
+  partner: { icon: '🤝', name: '合伙人信', cls: 'partner' },
+  speech:  { icon: '🎤', name: '演讲访谈', cls: 'speech' },
+  memo:    { icon: '📝', name: '致辞短文', cls: 'memo' },
+  web:     { icon: '🌐', name: '网络来源', cls: 'web' },
+  case:    { icon: '🎬', name: '案例', cls: 'case' },
+  other:   { icon: '🔖', name: '资料', cls: 'other' }
+};
+function citeKindOf(label) {
+  const s = String(label || '');
+  if (s === 'web') return 'web';
+  if (s.indexOf('sc-') === 0 || s.indexOf('rule-') === 0 || s.indexOf('corr-') === 0) return 'case';
+  if (/致合伙人信|合伙人信/.test(s)) return 'partner';
+  if (/致股东信|致股东的信/.test(s)) return 'letter';
+  if (/股东大会|年会|年度大会/.test(s)) return 'speech';
+  if (/演讲|访谈|对话|问答/.test(s)) return 'speech';
+  if (/致辞|短文|序言|过去现在与未来|副董事长的思考/.test(s)) return 'memo';
+  return 'other';
+}
+/* 一条引用标记 → 前端要的几个字段。year 只用来做胶囊上的短标签。 */
+function citeMeta(label, ref) {
+  const k = citeKindOf(label);
+  const pack = CITE_KINDS[k] || CITE_KINDS.other;
+  const s = String(label || '');
+  return {
+    k: k, icon: pack.icon, name: pack.name, cls: pack.cls,
+    year: (s.match(/\d{4}/) || [''])[0] || '',
+    l: k === 'web' || k === 'case' ? '' : s,
+    b: k === 'web' || k === 'case' ? 0 : (+ref || 0),
+    url: k === 'web' ? String(ref || '') : ''
+  };
+}
+/* 答案里出现过的引用标记（去重，保持出现顺序）。前端拿它把标记画成可点的符号。 */
+function citeBag(text) {
+  const out = [], seen = {};
+  const re = /\[\[([^|\]]+)\|(\d+)\]\]|\[\[web\|([^\]]+)\]\]/g;
+  let m;
+  while ((m = re.exec(String(text || '')))) {
+    const key = m[0];
+    if (seen[key]) continue;
+    seen[key] = 1;
+    const label = m[3] !== undefined ? 'web' : m[1];
+    const ref = m[3] !== undefined ? m[3] : m[2];
+    out.push(Object.assign({ key: key }, citeMeta(label, ref)));
   }
   return out;
 }
@@ -1488,13 +1692,16 @@ function emitSSE(res, q, ip) {
       } else {
         emit('quota', { left: 0, total: FREE_PER_VISITOR, keySource: 'byo' });
       }
+      const wantMode = q.mode === 'simulate' ? 'simulate' : 'archive';
+      const effMode = triageMode(q.message, wantMode);
+      if (effMode !== wantMode) console.log(`  [分诊] 前端说 ${wantMode}，按问题内容改走 ${effMode}：${String(q.message).slice(0, 40)}`);
       const info = await runAgent({
         message: String(q.message || '').slice(0, 2000),
         session: String(q.session || 'default').slice(0, 40),
         /* 默认走快的那个：坐着聊天等 40 秒太长。想要更细的推理再选 pro。 */
         model: model,
         web: q.web !== false,
-        mode: q.mode === 'simulate' ? 'simulate' : 'archive',
+        mode: effMode,
         asOf: q.as_of || '',
         anon: q.anon === true || q.anon === 1,
         wantMindset: q.mindset !== false,

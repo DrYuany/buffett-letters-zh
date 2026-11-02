@@ -139,8 +139,10 @@ async function grade(item, ans, anon) {
    B 正文提及（要看语境）：他的信里本来就充满对下一年的前瞻（"我们打算在 1989 年袖手旁观"、
      "如果 1991 年 10% 的贷款出问题"）。这些是当年写给当年的，不是泄漏。
      所以带假设/计划词的提及不算，只把像在陈述既成事实的挑出来给人看。 */
-const HYP = /(如果|若|假设|假如|万一|将会|将在|会|打算|准备|预期|预计|希望|可能|届时|未来)/;
-function leakYears(ans, asOf) {
+/* 前瞻词可能在年份前（"如果 1991 年"），也可能在后（"1989 年我打算"），
+   所以判定要看年份前后各一段，只看前面会漏掉一半。到期日、行权截止日也是当年已知的。 */
+const HYP = /(如果|若|假设|假如|万一|将会|将在|会|打算|准备|预期|预计|希望|可能|届时|未来|到期|之前|以前|起算)/;
+function leakYears(ans, asOf, brief) {
   const cites = [...ans.matchAll(/\[\[(?:(\d{4})\s*[^\]|]*)\|(\d+)\]\]/g)]
     .map(m => +m[1]).filter(y => y > asOf && y <= 2035);
   const body = [...ans.matchAll(/(19\d{2}|20\d{2})\s*年/g)].map(m => ({ y: +m[1], at: m.index }));
@@ -153,15 +155,19 @@ function leakYears(ans, asOf) {
   for (const s of sents) {
     /* 带引用标记的算引文；带「」的也算 —— 引号里就是逐字原文，标记常常掉到下一行，
        只认标记会漏判。 */
-    if (/\[\[[^\]]+\|\d+\]\]|\[\[web\||[「」]/.test(s)) for (let i = off; i < off + s.length; i++) quoted.add(i);
+    /* 引号有四种写法：中文「」、“”，英文 "" —— 只认「」会把一半引文当成正文。 */
+    if (/\[\[[^\]]+\|\d+\]\]|\[\[web\||[「」“”"]/.test(s)) for (let i = off; i < off + s.length; i++) quoted.add(i);
     off += s.length;
   }
   const assert = [];
+  const briefY = new Set((String(brief || '').match(/19\d{2}|20\d{2}/g) || []).map(Number));
   for (const b of body) {
     if (b.y <= asOf || b.y > 2035) continue;
     if (quoted.has(b.at)) continue;          /* 在引文里 */
-    const before = ans.slice(Math.max(0, b.at - 16), b.at);
-    if (HYP.test(before)) continue;          /* 前瞻假设，不算 */
+    /* 题面自己给出的年份（债券到期日、合约期限）复述不算泄漏 */
+    if (briefY.has(b.y)) continue;
+    const ctx = ans.slice(Math.max(0, b.at - 24), b.at + 14);
+    if (HYP.test(ctx)) continue;             /* 前瞻假设 / 已知到期日，不算 */
     assert.push(b.y);
   }
   return { cite: [...new Set(cites)], assert: [...new Set(assert)] };
@@ -207,7 +213,7 @@ const jac = (a, b) => {
     console.log(`重判 ${d.rows.length} 条（不重新提问）：${f}`);
     let coverSum = 0, coverN = 0, citeLeak = 0, assertLeak = 0;
     for (const r of d.rows) {
-      r.leak = leakYears(r.ans, r.y);
+      r.leak = leakYears(r.ans, r.y, r.brief);
       r.sem = await semCover(r.vars, (r.got || {}).vars || []);
       if (r.sem.cover > 0) { coverSum += r.sem.cover; coverN++; }
       if (r.leak.cite.length) citeLeak++;
@@ -252,7 +258,7 @@ const jac = (a, b) => {
     const ok = g.action === it.action;
     const base = majority === it.action;
     const jv = jac(g.vars, it.vars);
-    const lk = leakYears(ans, it.y);
+    const lk = leakYears(ans, it.y, it.brief);
     const sem = await semCover(it.vars, g.vars);
     hit += ok ? 1 : 0; baseHit += base ? 1 : 0;
     if (lk.cite.length) citeLeak++;
