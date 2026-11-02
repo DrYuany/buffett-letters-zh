@@ -182,18 +182,34 @@ async function gen(sysPrompt, q) {
 async function judge(pair) {
   const sys = '你是一个文体鉴定员。你会看到两段中文，其中一段摘自一批真实的致股东信，另一段是模仿者写的。只从用词、句长、语气、论证方式判断，不要因为提到具体年份或公司就下结论。只输出 A 或 B，不要解释。';
   const u = `A：${pair[0]}\n\nB：${pair[1]}\n\n哪一段更可能是真实的那批信里的一段？只回 A 或 B。`;
-  const r = await fetch(API, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'deepseek-v4-pro',
-      messages: [{ role: 'system', content: sys }, { role: 'user', content: u }],
-      temperature: 0, max_tokens: 4, stream: false,
-    }),
-  });
-  const j = await r.json();
-  const t = (j.choices[0].message.content || '').trim().toUpperCase();
-  return t.indexOf('A') === 0 ? 0 : 1;
+  /* max_tokens 给 8 是不够的：pro 是推理模型，先想再答，8 个 token 全被推理吃掉，
+     content 返回空串，解析成"选了 B" —— 结果恒为 0 认出。踩过一次，记在这儿。
+     400 也不总够（长文本推理更费），所以空了就加预算重试，不要静默当成 B。 */
+  let t = '';
+  const budgets = [400, 900, 1500, 1500];
+  for (let i = 0; i < budgets.length; i++) {
+    if (i) await new Promise(r => setTimeout(r, 1200 * i));
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'deepseek-v4-pro',
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: u }],
+        temperature: 0, max_tokens: budgets[i], stream: false,
+      }),
+    });
+    const j = await r.json();
+    const msg = j.choices[0].message || {};
+    t = (msg.content || '').trim().toUpperCase();
+    if (/[AB]/.test(t)) break;
+    /* content 空但推理里有结论：从推理尾巴里捞，比丢掉这一次好 */
+    const rc = (msg.reasoning_content || '').trim().toUpperCase();
+    const tail = rc.match(/[^A-Z]([AB])[^A-Z]?\s*$/);
+    if (tail) { t = tail[1]; break; }
+  }
+  const m = t.match(/[AB]/);
+  if (!m) return null;            /* 弃判：单独计数，不悄悄当成选了某一边 */
+  return m[0] === 'A' ? 0 : 1;
 }
 
 (async () => {
@@ -217,6 +233,26 @@ async function judge(pair) {
     out.controls[k] = { ratio: r, sentMed: sh.sentMed, oralRate: sh.oralRate };
     console.log(`  ${k}  比值 ${r}  句长 ${sh.sentMed} 字  口语标记 ${sh.oralRate}%`);
   });
+
+  /* 判官校准：拿对照写法去问，它必须认得出真段落。
+     认不出的判官，后面所有「认出率」都是噪声（0% 会被误读成"太像了"）。 */
+  if (DO_JUDGE) {
+    out.judgeCal = {};
+    for (const [k, t] of Object.entries(CTRL)) {
+      let w = 0, n = 0, skipped = 0;
+      for (let i = 0; i < 2; i++) {
+        const ref = picked[Math.floor(Math.random() * picked.length)].t;
+        const a = i ? [t, ref] : [ref, t];
+        const p1 = await judge(a), p2 = await judge([a[1], a[0]]);
+        if (p1 === null || p2 === null) { skipped++; continue; }
+        const i1 = p1 === 0 ? 0 : 1, i2 = p2 === 0 ? 1 : 0;
+        n++;
+        if (i1 === i2 && (i1 === 0 ? a[0] : a[1]) === ref) w++;
+      }
+      out.judgeCal[k] = +(w / n * 100).toFixed(0);
+      console.log(`  判官对「${k}」的认出率 ${out.judgeCal[k]}%（应接近 100%）`);
+    }
+  }
   console.log(`\n题目 ${out.n} 个，配置 ${configs.length} 种\n`);
 
   for (const cf of configs) {
@@ -229,7 +265,7 @@ async function judge(pair) {
     const ds = texts.map(dist);
     const ratio = mean(ds) / mean(realDist);
 
-    let win = 0, total = 0;
+    let win = 0, total = 0, skipped = 0;
     if (DO_JUDGE) {
       for (let i = 0; i < texts.length; i++) {
         const ref = picked[Math.floor(Math.random() * picked.length)].t;
@@ -238,6 +274,7 @@ async function judge(pair) {
         const a = flip ? [texts[i], ref] : [ref, texts[i]];
         const p1 = await judge(a);
         const p2 = await judge([a[1], a[0]]);
+        if (p1 === null || p2 === null) { skipped++; continue; }
         const idxFirst = p1 === 0 ? 0 : 1;
         const idxSecond = p2 === 0 ? 1 : 0;   // 换序后，"第一段"对应原第二段
         total++;
@@ -254,6 +291,7 @@ async function judge(pair) {
       shape: sh,
       judge_identified_real: total ? +(win / total * 100).toFixed(1) : null,
       judge_n: total,
+      judge_skipped: skipped,
       samples: texts.slice(0, 2),
     };
     console.log(`${cf.name.padEnd(11)} 比值 ${ratio.toFixed(2)}  句长 ${sh.sentMed} 字  每段 ${sh.sents} 句  口语标记 ${sh.oralRate}%` +

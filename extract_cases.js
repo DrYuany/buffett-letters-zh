@@ -144,9 +144,54 @@ for (const name in (CT.scorecards || {})) {
   });
 });
 
+/* ---- 并入公众演讲里抽出来的案例 ----
+   来源：_src/speech/cases.json（extract_speech_cases.js 产出，素材是 1985-2025 的演讲与访谈）
+   这些案例没有信件坐标（quote_locs 为空），但带自己的场合坐标 src.venue——
+   引用时说清"1998 年在佛罗里达讲的"就够了。能不能逐字引用，看的是这份
+   是逐字稿还是凭笔记整理的转述（src.fid），不是看有没有信件段落。 */
+let nSpeech = 0;
+const SPEECH_CASES = path.join(__dirname, '_src', 'speech', 'cases.json');
+if (fs.existsSync(SPEECH_CASES)) {
+  const raw = JSON.parse(fs.readFileSync(SPEECH_CASES, 'utf8'));
+  const SLOT_NAMES = SLOT_RULES.map(x => x[0]);
+  const seenJ = new Set(cases.map(c => String(c.judgment || '').slice(0, 20)));
+  for (const x of raw) {
+    const j = String(x.judgment || '').trim();
+    if (j.length < 12) continue;
+    const key = j.slice(0, 20);
+    if (seenJ.has(key)) continue;           /* 档案里已有同款，不重复进 */
+    seenJ.add(key);
+    const kind = ['scorecard', 'rule', 'correction'].indexOf(x.kind) >= 0 ? x.kind : 'rule';
+    cases.push({
+      id: 'sp-' + kind + '-' + (++nSpeech),
+      persona: 'buffett',
+      kind: kind,
+      y: +x.y || (x.src && x.src.y) || 0,
+      entity: String(x.entity || ''),
+      tags: [x.entity].filter(Boolean),
+      situation: String(x.situation || ''),
+      judgment: j,
+      judgment_verbatim: !!x.judgment_verbatim,
+      quote_locs: [],
+      outcome: '',
+      lesson: String(x.lesson || ''),
+      verdict: String(x.verdict || ''),
+      slots: (Array.isArray(x.slots) ? x.slots : []).filter(s => SLOT_NAMES.indexOf(s) >= 0),
+      auto: true,
+      src: x.src || null,
+    });
+  }
+  console.log('  并入演讲案例 ' + nSpeech + ' 条（候选 ' + raw.length + ' 条，去重后）');
+}
+
 /* 「逐字可引」不能只因为有 loc 就算数：真去把那一段取出来，看这句话在不在里面。
-   概述式、转述式的档案文字会被这里筛掉，分身就不可能拿它冒充原话。 */
+   概述式、转述式的档案文字会被这里筛掉，分身就不可能拿它冒充原话。
+   演讲案例没有信件 loc，走另一条判据：这份是逐字稿（verbatim）才许逐字引用。 */
 for (const c of cases) {
+  if (c.src && c.src.kind === 'speech') {
+    c.judgment_verbatim = !!c.judgment_verbatim && c.src.fid === 'verbatim';
+    continue;
+  }
   if (!c.quote_locs.length) { c.judgment_verbatim = false; continue; }
   const loc = c.quote_locs[0];
   const blk = L[loc.l] && L[loc.l].blocks[loc.b];
@@ -164,6 +209,7 @@ const meta = {
   persona: 'buffett',
   total: cases.length,
   by_kind: byKind,
+  by_src: { letters: cases.length - nSpeech, speech: nSpeech },
   with_loc: cases.filter(c => c.quote_locs.length > 0).length,
   verbatim_ok: cases.filter(c => c.judgment_verbatim).length,
   slots_auto: cases.filter(c => c.auto).length,

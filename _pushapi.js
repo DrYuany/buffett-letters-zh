@@ -18,7 +18,8 @@ function git(args) {
   return r.stdout;
 }
 function api(method, path, body) {
-  const args = ['api', '-X', method, path];
+  /* 路径不要前导斜杠：Git Bash（MSYS）会把 /repos/... 当成文件路径改写掉 */
+  const args = ['api', '-X', method, String(path).replace(/^\//, '')];
   if (body !== undefined) args.push('--input', '-');
   const r = spawnSync('gh', args, {
     input: body === undefined ? undefined : JSON.stringify(body),
@@ -30,8 +31,15 @@ function api(method, path, body) {
 }
 
 (async () => {
-  const remote = git(['rev-parse', 'origin/' + BRANCH]).trim();
-  const ahead = git(['rev-list', '--reverse', 'origin/' + BRANCH + '..' + BRANCH]).trim().split('\n').filter(Boolean);
+  /* 基准必须用远端真实 head，不能用本地的 origin/main ——
+     上次走 API 推过之后本地的 remote-tracking ref 还停在旧位置，
+     拿它当 parents 会被远端以「not a fast forward」拒掉。 */
+  const remote = api('GET', 'repos/' + REPO + '/git/refs/heads/' + BRANCH).object.sha;
+  /* 上一轮 API 推上去的 commit 在本地并不存在（是远端生成的），这时 rev-list 会报
+     Invalid revision range。给 --commits 显式列出要推的提交即可。 */
+  const given = (() => { const i = process.argv.indexOf('--commits'); return i >= 0 ? process.argv[i + 1] : ''; })();
+  const ahead = given ? given.split(',').filter(Boolean)
+    : git(['rev-list', '--reverse', remote + '..' + BRANCH]).trim().split('\n').filter(Boolean);
   if (!ahead.length) { console.log('没有领先的提交，不用推。'); return; }
   console.log('远端 ' + remote.slice(0, 7) + ' · 本地领先 ' + ahead.length + ' 个提交：');
   ahead.forEach(c => console.log('  ' + c.slice(0, 7) + '  ' + git(['log', '-1', '--format=%s', c]).trim()));
@@ -49,11 +57,11 @@ function api(method, path, body) {
       const content = git(['show', c + ':' + p]);
       tree.push({ path: p, mode: mode, type: 'blob', content: content });
     }
-    const t = api('POST', '/repos/' + REPO + '/git/trees', { base_tree: head, tree: tree });
-    const cm = api('POST', '/repos/' + REPO + '/git/commits', {
+    const t = api('POST', 'repos/' + REPO + '/git/trees', { base_tree: head, tree: tree });
+    const cm = api('POST', 'repos/' + REPO + '/git/commits', {
       message: msg, tree: t.sha, parents: [head]
     });
-    api('PATCH', '/repos/' + REPO + '/git/refs/heads/' + BRANCH, { sha: cm.sha });
+    api('PATCH', 'repos/' + REPO + '/git/refs/heads/' + BRANCH, { sha: cm.sha });
     head = cm.sha;
     console.log('  → ' + c.slice(0, 7) + ' 推上去成 ' + cm.sha.slice(0, 7) +
       '（改了 ' + changed.length + ' 个文件）');
