@@ -13,7 +13,9 @@ const BRANCH = 'main';
 const DRY = process.argv.indexOf('--dry') >= 0;
 
 function git(args) {
-  const r = spawnSync('git', args, { encoding: 'utf8', maxBuffer: 1 << 26 });
+  /* core.quotepath=false：中文路径默认会被转义成 "eval/\345..." 这种带引号的形式，
+     再传给 git show 就找不到文件（API 推送在含中文文件名的提交上会直接失败）。 */
+  const r = spawnSync('git', ['-c', 'core.quotepath=false'].concat(args), { encoding: 'utf8', maxBuffer: 1 << 26 });
   if (r.status !== 0) throw new Error('git ' + args.join(' ') + ' 失败：' + (r.stderr || '').slice(0, 200));
   return r.stdout;
 }
