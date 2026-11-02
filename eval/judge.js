@@ -65,11 +65,36 @@ async function ask(q) {
   return parseSSE(await r.text());
 }
 
-/* 从正文里捞它自己说的 PE 和价格，跟实时数据比 */
+/* 从正文里捞它自己说的 PE 和价格，跟实时数据比。
+   注意两个天然误报：正文里还有同行 PE（"汾酒 14.4 倍"）和历史区间价
+   （"区间两头是 1148.73 和 1843.73"）。这些不是当前值，不该判成编造。
+   所以判据是「至少有一处跟实时数据吻合」——一处都对不上，才说明它没真查。 */
 function extractClaims(ans) {
   const pe = [...ans.matchAll(/PE[^0-9]{0,6}(\d+(?:\.\d+)?)\s*倍/gi)].map(m => +m[1]);
-  const px = [...ans.matchAll(/(\d{2,4}\.\d{1,2})\s*元/g)].map(m => +m[1]);
-  return { pe, px };
+  const px = [...ans.matchAll(/(\d{2,4}(?:\.\d{1,2})?)\s*元/g)].map(m => +m[1]);
+  return { pe: [...new Set(pe)], px: [...new Set(px)] };
+}
+function anyClose(vals, target, tol) {
+  if (target == null) return true;
+  return vals.some(x => Math.abs(x - target) / target <= tol);
+}
+
+/* 拿实时数据核对正文里的 PE 和股价。答案存下来之后可以单独重算，
+   改判据不用重跑问答（模型调用要花钱，也会给出不一样的话）。 */
+async function checkNums(ans, ent) {
+  const cl = extractClaims(ans);
+  let live = null;
+  try { live = await MARKET.snapshot(ent); } catch (e) {}
+  let badPe = [], badPx = [];
+  if (live && live.ok && live.quote) {
+    const p = live.quote.pe, q = live.quote.price;
+    if (p && cl.pe.length && !anyClose(cl.pe, p, 0.08)) badPe = cl.pe;
+    if (q && cl.px.length && !anyClose(cl.px, q, 0.08)) badPx = cl.px;
+  } else if (live && live.ok && live.eva) {
+    const p = live.eva.pe;
+    if (p && cl.pe.length && !anyClose(cl.pe, p, 0.15)) badPe = cl.pe;
+  }
+  return { badPe, badPx, claims: cl };
 }
 
 function split(ans) {
@@ -86,7 +111,31 @@ function split(ans) {
   return out;
 }
 
+/* --regate 文件：只重算数字核对和汇总，不重新问模型 */
+async function regate(file) {
+  const d = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const byId = Object.fromEntries(CASES.map(c => [c.id, c]));
+  for (const r of d.rows) {
+    if (r.err || !r.ans) continue;
+    const c = byId[r.id];
+    if (!c) continue;
+    const { badPe, badPx } = await checkNums(r.ans, c.ent);
+    r.badPe = badPe; r.badPx = badPx;
+    console.log(`[${r.id}] PE ${badPe.length ? '对不上 ' + badPe.join(',') : '对得上'}` +
+      `｜股价 ${badPx.length ? '对不上 ' + badPx.join(',') : '对得上'}`);
+  }
+  const ok = d.rows.filter(r => !r.err && r.ans);
+  const sum = d.sum;
+  sum.badNum = ok.filter(r => (r.badPe || []).length || (r.badPx || []).length).length;
+  const f = path.join(__dirname, 'results', 'judge-' + Date.now() + '.json');
+  fs.writeFileSync(f, JSON.stringify({ ...d, at: new Date().toISOString(), regatedFrom: file, sum, rows: d.rows }, null, 1));
+  console.log(`\n数字与实时数据对不上 ${sum.badNum}/${sum.n} 题（应为 0）`);
+  console.log('重算结果：' + f);
+}
+
 (async () => {
+  const ri = process.argv.indexOf('--regate');
+  if (ri > 0) return regate(process.argv[ri + 1]);
   const rows = [];
   for (const c of CASES.slice(0, N)) {
     process.stdout.write(`\n[${c.id}] ${c.q}\n`);
@@ -109,19 +158,7 @@ function split(ans) {
     };
 
     /* 数字核对：拿实时数据比它写的 */
-    let live = null;
-    try { live = await MARKET.snapshot(c.ent); } catch (e) {}
-    const cl = extractClaims(r.ans);
-    let badPe = [], badPx = [];
-    if (live && live.ok && live.quote) {
-      const p = live.quote.pe;
-      if (p) badPe = cl.pe.filter(x => Math.abs(x - p) / p > 0.08);
-      const q = live.quote.price;
-      if (q) badPx = cl.px.filter(x => Math.abs(x - q) / q > 0.08);
-    } else if (live && live.ok && live.eva) {
-      const p = live.eva.pe;
-      if (p) badPe = cl.pe.filter(x => Math.abs(x - p) / p > 0.15);
-    }
+    const { badPe, badPx } = await checkNums(r.ans, c.ent);
 
     const row = {
       id: c.id, heads: headsOk.length, headsMissing: HEADS.filter(h => sec[h] == null),

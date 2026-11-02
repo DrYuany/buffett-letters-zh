@@ -112,7 +112,7 @@ async function quotes(items) {
   if (!list.length) return [];
   const ids = list.map(x => x.secid).join(',');
   const url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?secids=' + encodeURIComponent(ids) +
-    '&fields=f2,f3,f4,f12,f14,f15,f16,f18,f20,f9,f23,f5,f6';
+    '&fields=f2,f3,f12,f14,f15,f16,f18,f20,f9,f23,f114,f115';
   const j = await httpJSON(url);
   const diff = (j && j.data && j.data.diff) || [];
   const byCode = new Map(diff.map(d => [String(d.f12), d]));
@@ -126,7 +126,12 @@ async function quotes(items) {
       price: px(d.f2, it), prev: px(d.f18, it),
       chgPct: num(d.f3) === null ? null : d.f3 / 100,
       high: px(d.f15, it), low: px(d.f16, it),
-      mcap: num(d.f20), pe: num(d.f9) === null ? null : d.f9 / 100,
+      mcap: num(d.f20),
+      /* 三个 PE 口径差得不小（茅台 20.93 / 21.85 / 21.90），财经站和 MCP 通常用 TTM。
+         全给出来，正文里说清用哪个，免得读者拿别的网站一对就以为算错了。 */
+      pe: num(d.f9) === null ? null : d.f9 / 100,
+      peTTM: num(d.f115) === null ? null : d.f115 / 100,
+      peStatic: num(d.f114) === null ? null : d.f114 / 100,
       pb: num(d.f23) === null ? null : d.f23 / 100,
       cur,
     };
@@ -303,7 +308,12 @@ async function snapshot(q, opt = {}) {
     (quote.chgPct !== null ? `，当日 ${pctText(quote.chgPct)}` : '') +
     (quote.high !== null && quote.low !== null ? `，当日区间 ${quote.low.toFixed(2)}–${quote.high.toFixed(2)}` : ''));
   if (quote.mcap) L.push(`  总市值 ${bigMoney(quote.mcap, quote.cur)}`);
-  if (quote.pe !== null && quote.pe > 0) L.push(`  PE（动）${quote.pe.toFixed(2)} 倍`);
+  if (quote.peTTM !== null && quote.peTTM > 0) {
+    L.push(`  PE ${quote.peTTM.toFixed(2)} 倍（TTM，滚动十二个月）` +
+      (quote.pe !== null && quote.pe > 0 ? `；动态 ${quote.pe.toFixed(2)} 倍` : ''));
+  } else if (quote.pe !== null && quote.pe > 0) {
+    L.push(`  PE ${quote.pe.toFixed(2)} 倍（动态）`);
+  }
   if (quote.pb !== null && quote.pb > 0) L.push(`  PB ${quote.pb.toFixed(2)} 倍`);
   if (band) {
     L.push(`价格位置（近 ${band.months} 个月月线，共 ${band.months} 个收盘价）：`);
