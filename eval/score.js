@@ -178,7 +178,18 @@ function scoreNumTrace(trace) {
      时，答案里说"1994 年"就该算对，不该扣"未在 srcYears"。 */
   const toolYears = new Set();
   (toolHay.match(/(?:19|20)\d{2}/g) || []).forEach(y => toolYears.add(+y));
-  const srcYears = new Set([...(trace.sources || []).filter(s => s.kind === 'letter').map(s => s.y), ...toolYears]);
+  /* 语料自己的元数据（98 封信、1956–2025、122 万字）不写在任何一封信里，
+     但它是真的，不是编的 —— 把它们算进可溯源集合，别让"介绍语料规模"被判成捏造。 */
+  const { C } = corpus();
+  const metaYears = (C.meta && C.meta.years) || [];
+  const metaNums = new Set();
+  if (C.meta) {
+    [C.meta.letters, C.meta.blocks, C.meta.companies, C.meta.concepts, C.meta.people]
+      .forEach(v => { if (v) metaNums.add(String(v)); });
+    const wan = Math.round((C.meta.chars || 0) / 10000);
+    if (wan) { metaNums.add(String(wan)); metaNums.add(wan + '万'); }
+  }
+  const srcYears = new Set([...(trace.sources || []).filter(s => s.kind === 'letter').map(s => s.y), ...toolYears, ...metaYears]);
   const body = String(trace.answer || '').replace(/\[\[[^\]]+\]\]/g, '');
   if (ABSTAIN.test(body)) return { n: 0, ok: 0, bad: [], rate: null, note: '这一问在拒答，不适用' };
   const hasWeb = parseCites(trace.answer).some(c => c.kind === 'web');
@@ -204,6 +215,7 @@ function scoreNumTrace(trace) {
     }
     if (allHay.indexOf(core) >= 0) { ok++; continue; }
     if (toolNumSet.has(core)) { ok++; continue; }
+    if (metaNums.has(core)) { ok++; continue; }
     bad.push(x);
   }
   return { n: uniq.length, ok: ok, bad: bad.slice(0, 8), rate: uniq.length ? +(ok / uniq.length).toFixed(3) : null,
