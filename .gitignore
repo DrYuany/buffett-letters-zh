@@ -14,7 +14,8 @@ eval/traces/
 eval/results/
 
 # 审计 / 排查的过程产物
-_agent.log
+*.log
+_probe*.txt
 _audit*.log
 _rendered_text.json
 _inline.js

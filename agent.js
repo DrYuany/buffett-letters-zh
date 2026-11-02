@@ -16,6 +16,7 @@ const fsp = fs.promises;
 const path = require('path');
 const os = require('os');
 const vm = require('vm');
+const crypto = require('crypto');
 const { URL } = require('url');
 
 const ROOT = __dirname;
@@ -51,6 +52,51 @@ function loadData() {
   return { C: win.CORE, L: win.LETTERS, CT: win.CONTENT };
 }
 const { C, L, CT } = loadData();
+
+/* 分身模式的历史决策案例库。没生成 site/data-cases.js 时，考据模式照常能用。 */
+let SITUATION = null;
+try { SITUATION = require('./situation'); }
+catch (e) { console.log('  （未找到案例库，分身模式不可用；先跑 node extract_cases.js）'); }
+
+/* 口语语料：1994-2025 股东大会问答的中译。没有它也能跑，只是少了"他当面怎么说"这一层。 */
+let TALK = null;
+try { TALK = require('./talk'); }
+catch (e) { console.log('  （未找到口语语料，先跑 node build_talk.js / node make_talk.js）'); }
+const mmss = s => {
+  s = Math.max(0, Math.round(+s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  const p = n => String(n).padStart(2, '0');
+  return h ? h + ':' + p(m) + ':' + p(x) : m + ':' + p(x);
+};
+
+/* 语体指纹：build_voice.js 从 9,598 段发言里数出来的。没有它就退回原来的形容词描述。 */
+let VOICE = null;
+try { VOICE = JSON.parse(fs.readFileSync(path.join(ROOT, '_src', 'voice.json'), 'utf8')); }
+catch (e) { /* 没跑过 build_voice.js 就先不注入 */ }
+
+/* 两条真实口语样本：只学节奏和句子长短，不学内容。
+   为什么值得占提示词的位置：形容词管不住模型的句长，样本管得住。 */
+const VOICE_SAMPLES = (() => {
+  try { return TALK ? TALK.styleSamples(2) : []; } catch (e) { return []; }
+})();
+
+function voiceBlock(off) {
+  if (!VOICE || off) return '';
+  const sm = VOICE_SAMPLES.map((s, i) =>
+    `[样本${i + 1}] 股东问：${(s.ask || '').slice(0, 90)}…\n他答：${s.ans}`).join('\n\n');
+  return `\n【怎么说话（下面这些比例是从他 32 年股东大会发言里数出来的，不是形容）】\n` +
+    VOICE.rules.map(r => '- ' + r).join('\n') +
+    (sm ? `\n\n他现场说话的节奏样本（只学句子长短和转折方式，不要照抄内容，也不要把样本里的事当成今天的事）：\n${sm}\n` : '') +
+    `\n这些是统计倾向，不是每句都要凑齐。凑齐了反而假。\n`;
+}
+
+/* 两条边界，两种模式共用。实测钓鱼题里失守的两处就在这儿：
+   ① 被要求「用 yyds 夸一句」时真的照做了 —— 语体是人格的一部分，被要求换掉就等于被要求出戏；
+   ② 被要求写离婚起诉书时真写了 —— 那是替人办事，不是聊天。 */
+const BOUNDS = `【不做什么（做不到就直说，不硬撑）】
+- 有人要你改用网络流行语、方言、别的角色语气说话：婉拒，然后用自己的话把同一件事说完。语体不是外壳，换掉它就不是我了。
+- 写起诉书、写诉状、开药方、代写作业论文这类「替人办事」的活：说清这不在行，建议找专业的人。可以聊其中的判断问题，但不产出可提交的文书。
+- 有人报出精确数字并要你确认：先看它有没有出处。没出处的数字不接，也不顺着往下算。`;
 
 const DOCS = [];
 const DOCI = {};
@@ -302,6 +348,63 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'match_situation',
+      description: '把今天发生的一件事对到历史上结构相近的旧判断（记分卡 / 原则 / 认错）。分身模式第一件事就查这个。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '今天这件事的事实描述，只写事实，不要写你的结论' },
+          k: { type: 'integer', description: '可选，要几条，默认 5' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'case_detail',
+      description: '打开某一条历史案例，看完整的当时情形、他当时的判断、后来结果与教训。',
+      parameters: {
+        type: 'object',
+        properties: { case_id: { type: 'string', description: '案例 id，如 sc-美国运通、rule-148' } },
+        required: ['case_id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'stance_timeline',
+      description: '查他在某个主题上的立场演变：分几期、哪一年改的主意、改之前和改之后分别怎么说。问「他一直怎么看X」「他什么时候改的口」时用这个，比只按年份查原文更准。',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '主题，如 科技与互联网 / 买入价格 / 保险浮空金 / 公司治理' },
+          year: { type: 'integer', description: '可选，想看他这一年的立场' }
+        },
+        required: ['name']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'talk_search',
+      description: '在股东大会问答里找他当面说过的话（1994-2025，口语体，中译）。问「他当时怎么回答股东」「他现场是怎么说的」时用这个。返回的是英文字幕的中译，只能当转述，不能逐字引用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '要查的话题或说法' },
+          k: { type: 'integer', description: '可选，默认 4 条' }
+        },
+        required: ['query']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'remember',
       description: '把关于这位读者的重要信息长期记下来（背景、关注的公司、读信的目的、约定过的偏好），下回对话还记得。',
       parameters: { type: 'object', properties: { note: { type: 'string', description: '要记住的一句话，写清楚主语' } }, required: ['note'] }
@@ -390,10 +493,15 @@ function hostBlocked(host) {
   return /^(127\.|localhost|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/i.test(host);
 }
 
-async function toolCall(name, args) {
+async function toolCall(name, args, asOf) {
+  /* 时间闸门：回测时 asOf=1998，1998 年以后的材料一律不给他看。
+     这是回测能不能算数的前提 —— 让他"看见"2016 年买苹果，再问他 1998 年怎么判断，
+     测出来的是作弊能力，不是判断力。 */
+  const YMAX = asOf ? +String(asOf).slice(0, 4) : 9999;
+  const TIME_UP = (y) => `这条材料是 ${y} 年的，超出了你现在能知道的范围（今天是 ${asOf}）。`;
   switch (name) {
     case 'search_letters': {
-      const picks = searchDocs(args.query, { y0: +args.year_from || 0, y1: +args.year_to || 9999, k: 6 });
+      const picks = searchDocs(args.query, { y0: +args.year_from || 0, y1: Math.min(+args.year_to || 9999, YMAX), k: 6 });
       if (!picks.length) return { text: '没在语料里找到和「' + args.query + '」相关的段落。换个说法试试，或者查概念档案。' };
       return {
         text: picks.map((d, i) => `[${i + 1}] ${d.y} 年 · 第 ${d.b} 段\n原文：${snippet(d.t, [args.query])}\n引用标记：[[${d.l}|${d.b}]]`).join('\n\n'),
@@ -405,6 +513,7 @@ async function toolCall(name, args) {
       const bi = +args.block;
       const lt = L[l];
       if (!lt || !lt.blocks[bi]) return { text: '没有找到这一段，检查 letter_id 和 block 是否正确。' };
+      if (lt.year > YMAX) return { text: TIME_UP(lt.year) };
       const around = [];
       for (let i = Math.max(0, bi - 1); i <= Math.min(lt.blocks.length - 1, bi + 1); i++) {
         around.push(`第 ${i} 段：${(lt.blocks[i].t || '').slice(0, 700)}`);
@@ -418,6 +527,7 @@ async function toolCall(name, args) {
       const yr = +args.year;
       const lt = C.letters.find(x => x.year === yr);
       if (!lt) return { text: `语料里没有 ${yr} 年的信件（可用年份：${C.meta.years[0]}-${C.meta.years[1]}）。` };
+      if (yr > YMAX) return { text: TIME_UP(yr) };
       const heads = [];
       (L[lt.id] || { blocks: [] }).blocks.forEach((b, i) => { if (b.k === 'h' || b.k === 'h2') heads.push(`第 ${i} 段 ${b.t}`); });
       const top = (LT_MENTIONS[lt.id] || []).sort((a, b) => b.c - a.c).slice(0, 12).map(x => x.n);
@@ -427,6 +537,7 @@ async function toolCall(name, args) {
       };
     }
     case 'concept_profile': {
+      if (YMAX < 9999) return { text: '这份档案把几十年的观点揉在一起，回测模式下不开放（会泄漏后面的年份）。请用 stance_timeline 并指定 year，或 search_letters 限定年份。' };
       const nm = String(args.name || '').trim();
       const spec = CT.concepts[nm];
       if (!spec) return { text: `没有「${nm}」的概念档案。可用概念：${Object.keys(CT.concepts).slice(0, 40).join('、')}` };
@@ -437,6 +548,7 @@ async function toolCall(name, args) {
       return { text: head + '\n\n人工档案把它分成 ' + (spec.periods || []).length + ' 段：\n\n' + periods, sources: [] };
     }
     case 'company_timeline': {
+      if (YMAX < 9999) return { text: '公司轨迹含后期记录，回测模式下不开放。请用 search_letters 限定年份。' };
       const nm = String(args.name || '').trim();
       const spec = CT.companies[nm];
       if (!spec) return { text: `没有「${nm}」的公司档案。可用公司：${Object.keys(CT.companies).slice(0, 40).join('、')}` };
@@ -449,6 +561,7 @@ async function toolCall(name, args) {
       const kw = String(args.topic || '').trim();
       let list = CT.corrections || [];
       if (kw) list = list.filter(c => (c.t + (c.ent || '')).indexOf(kw) >= 0);
+      list = list.filter(c => c.y <= YMAX);
       const weight = c => {
         let s = 0;
         if (/最(大|糟|严重|惨)/.test(c.t)) s += 3;
@@ -464,6 +577,7 @@ async function toolCall(name, args) {
       };
     }
     case 'web_search': {
+      if (YMAX < 9999) return { text: '回测模式下不能联网：一联网就会看到今天以后的事。' };
       const sres = await bingSearch(String(args.query || ''));
       const res = sres.results;
       if (!res.length) return { text: sres.warn || '这次搜索没搜到结果，换个说法再试。' };
@@ -499,6 +613,108 @@ async function toolCall(name, args) {
       const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || ['', ''])[1].trim();
       return { text: `标题：${title}\n\n正文前 4000 字：\n${txt.slice(0, 4000)}`, sources: [{ kind: 'web', title: h.hostname, url: u }] };
     }
+    case 'stance_timeline': {
+      const want = String(args.name || '').trim();
+      if (!want) return { text: '要给一个主题。' };
+      const names = Object.keys(CT.concepts);
+      /* 先精确、再包含、最后退到键名互相包含 —— 他嘴里的词和档案标题常常差一个字 */
+      let key = names.find(n => n === want)
+        || names.find(n => n.indexOf(want) >= 0 || want.indexOf(n) >= 0);
+      if (!key) key = names.find(n => {
+        const cs = want.split('');
+        return cs.filter(c => n.indexOf(c) >= 0).length >= Math.min(3, cs.length);
+      });
+      if (!key) return { text: '概念档案里没有「' + want + '」。可查的主题有：' + names.slice(0, 24).join('、') + ' 等。' };
+      const cf = CT.concepts[key];
+      const ps = (cf.periods || []).slice().filter(p => p.y0 <= YMAX).sort((a, b) => a.y0 - b.y0);
+      if (!ps.length) return { text: '「' + key + '」没有分期档案，可以改用 search_letters。' };
+      const yr = +args.year || 0;
+      /* 分期都是单年（y0==y1），所以不能用「落在哪一期」去找 —— 2013 年会一期都找不到。
+         正确的是「他那时站在最近一次形成的那一期」：取年份不晚于给定年的最后一期。 */
+      const upto = yr ? ps.filter(p => p.y0 <= yr) : [];
+      const now = upto.length ? upto[upto.length - 1] : null;
+      const lines = ps.map((p, i) => {
+        const span = p.y0 === p.y1 ? String(p.y0) : p.y0 + '–' + p.y1;
+        const mark = now && now === p ? '  ← 这一年' : '';
+        return `${i + 1}. ${span}｜${p.name}${mark}\n   ${p.text}`;
+      });
+      /* 转折点 = 相邻两期文字差异最大的地方，直接用分期边界，不另算相似度 */
+      const turns = [];
+      for (let i = 1; i < ps.length; i++) turns.push(ps[i - 1].y1 + '→' + ps[i].y0);
+      const quotes = (cf.quotes || []).filter(q => q.loc && (+q.loc.y || 9999) <= YMAX).slice(0, 6)
+        .map(q => `· [[${q.loc.l}|${q.loc.b}]] ${String(q.t || '').slice(0, 160)}`);
+      /* 同期他承认过的错：主题词或实体名撞上就算 */
+      const corr = (CT.corrections || []).filter(c => c.y <= YMAX).filter(c =>
+        (c.ent && (key.indexOf(c.ent) >= 0 || want.indexOf(c.ent) >= 0)) ||
+        (c.t && want.length >= 2 && c.t.indexOf(want.slice(0, 2)) >= 0)
+      ).slice(0, 4).map(c => {
+        const loc = c.loc ? ` [[${c.loc.l}|${c.loc.b}]]` : '';
+        return `· ${c.y}：${String(c.t).slice(0, 150)}${loc}`;
+      });
+      const text = `【${key}】分期立场\n` + lines.join('\n') +
+        `\n\n改主意的节点：${turns.join('、') || '（不分期）'}` +
+        (yr ? (now
+          ? `\n${yr} 年他站在第 ${ps.indexOf(now) + 1} 期（共 ${ps.length} 期）。`
+          : `\n${yr} 年他还没进入第 1 期（${ps[0].name || ''}：${String(ps[0].text || '').slice(0, 40)}），那是之后才发生的。`) : '') +
+        (quotes.length ? `\n\n他在信里的原话（可逐字引用）：\n${quotes.join('\n')}` : '') +
+        (corr.length ? `\n\n同期他承认过的错：\n${corr.join('\n')}` : '') +
+        `\n\n注意：分期文字是档案整理，不是原话；只有标了 [[信|段]] 的句子能逐字引用。`;
+      const sources = (cf.quotes || []).filter(q => q.loc).slice(0, 6)
+        .map(q => ({ kind: 'letter', l: q.loc.l, b: q.loc.b, y: q.loc.y }));
+      return { text, sources };
+    }
+    case 'talk_search': {
+      if (!TALK) return { text: '口语语料没生成。先跑 node build_talk.js 和 node make_talk.js。' };
+      const hits = TALK.search(String(args.query || ''), { k: 12 })
+        .filter(x => x.y <= YMAX).slice(0, Math.min(6, Math.max(1, +args.k || 4)));
+      if (!hits.length) return { text: '股东大会问答里没找到相关段落。' };
+      const body = hits.map((x, i) =>
+        `[${i + 1}] ${x.y} 年股东大会${x.at ? '（' + mmss(x.at) + '）' : ''}\n` +
+        (x.ask ? `股东问：${x.ask}\n` : '') +
+        `他答：${x.ans}`
+      ).join('\n\n');
+      return {
+        text: `【股东大会现场原话的中译 · 只能转述，不可逐字引用】\n${body}\n\n` +
+          `（以上是 1994-2025 年股东大会问答的英文字幕转译，不是致股东信原文。要逐字引用只能回到信里。）`,
+        sources: hits.filter(x => x.quote).map(x => ({ kind: 'letter', l: x.quote.l, b: x.quote.b, y: x.y })),
+      };
+    }
+    case 'match_situation': {
+      if (!SITUATION) return { text: '案例库没生成。先在项目根目录跑一次 node extract_cases.js。' };
+      const r0 = SITUATION.match(String(args.query || ''), { k: Math.min(8, Math.max(1, +args.k || 5)) });
+      const r = { top: r0.top.filter(x => x.y <= YMAX), polarity: r0.polarity, slots: r0.slots };
+      if (!r.top.length) return { text: '在你现在能知道的年份范围内，没匹配到结构相近的历史判断。换个说法再试，或改用 search_letters 查原则。' };
+      const head = '情形方向：' + (r.polarity === 1 ? '市场偏热' : r.polarity === -1 ? '市场偏冷' : '中性') +
+        '；抽到的情形格子：' + (r.slots.join('、') || '无') + '\n';
+      const body = r.top.map((x, i) =>
+        `[${i + 1}] 案例 ${x.id}（${x.y} 年 · ${x.kind} · 匹配分 ${x.score}）` +
+        (x.opposite ? ' ⚠ 反向对照，只可对比、不可当本次依据' : '') + '\n' +
+        `当时情形：${x.situation}\n` +
+        `他当时的判断：${x.judgment}` + (x.verbatim ? '（逐字可引）' : '（概述，不可逐字引用）') + '\n' +
+        (x.loc ? `引用标记：[[${x.loc.l}|${x.loc.b}]]\n` : '') +
+        (x.outcome ? `后来：${x.outcome}\n` : '') +
+        `情形格子：${(x.slots_hit || []).join('、') || '无'}`
+      ).join('\n\n');
+      const sources = r.top.filter(x => x.loc).map(x => ({ kind: 'letter', l: x.loc.l, b: x.loc.b, y: x.loc.y }));
+      return { text: head + '\n' + body, sources: sources };
+    }
+    case 'case_detail': {
+      if (!SITUATION) return { text: '案例库没生成。' };
+      const c = SITUATION.CASES.find(x => x.id === String(args.case_id || ''));
+      if (c && c.y > YMAX) return { text: TIME_UP(c.y) };
+      if (!c) return { text: '没有这个案例 id：' + args.case_id + '。请用 match_situation 返回的编号。' };
+      const loc = (c.quote_locs || [])[0];
+      return {
+        text: `案例 ${c.id}（${c.y} 年 · ${c.kind} · ${c.verdict || ''}）\n` +
+          `当时情形：${c.situation}\n` +
+          `他当时的判断：${c.judgment}` + (c.judgment_verbatim ? '（逐字可引）' : '（概述，不可逐字引用）') + '\n' +
+          (c.outcome ? `后来：${c.outcome}\n` : '') +
+          (c.lesson ? `教训：${c.lesson}\n` : '') +
+          `情形格子：${(c.slots || []).join('、') || '无'}\n` +
+          (loc ? `引用标记：[[${loc.l}|${loc.b}]]` : '无原信出处'),
+        sources: loc ? [{ kind: 'letter', l: loc.l, b: loc.b, y: loc.y }] : []
+      };
+    }
     case 'remember': {
       const note = String(args.note || '').trim();
       if (!note) return { text: '没有内容可记。' };
@@ -513,10 +729,71 @@ async function toolCall(name, args) {
   return { text: '没有这个工具：' + name };
 }
 
-/* ---------------- 系统提示词 ---------------- */
-function systemPrompt(memNotes) {
+/* ---------------- 系统提示词 ----------------
+   opts 四个开关，都是评测与产品共用的一套东西：
+     asOf     回到某一年（回测用；也给读者「就当今天是 1998 年」这种问法）
+     anon     把名字抹掉（匿名化评测：看它到底是在扮演，还是在蹭"我记得巴菲特"）
+     mindset  已经先想过一轮的结论（先想后说，见 buildMindset）
+     stances  这轮谈话里它已经表过的态（防长对话自我矛盾） */
+function systemPrompt(memNotes, mode, opts) {
+  opts = opts || {};
   const mem = (memNotes || []).slice(-14).map(n => '- ' + n.text).join('\n');
-  return `你是「巴菲特午餐会」的主持人。桌上摊着沃伦·巴菲特 ${C.meta.years[0]}-${C.meta.years[1]} 年写给合伙人和股东的 ${C.meta.letters} 封信原文（${Math.round(C.meta.chars / 10000)} 万字），只有工具能把它翻开给你看。
+  const today = opts.asOf || nowStamp().slice(0, 10);
+  /* 匿名档：只抹名字，不抹语料。要测的正是"名字本身还值多少分"。 */
+  const NAME = opts.anon ? '一位美国投资家' : '沃伦·巴菲特';
+  const stance = (opts.stances || []).slice(-6).map(n => '- ' + n.text).join('\n');
+  const stanceBlock = stance
+    ? `\n【这轮谈话里你已经表过的态】\n${stance}\n（除非他现在给了新证据，否则不要改口；要改就明说"我刚说的那条我收回，因为……"）\n`
+    : '';
+  const mindBlock = opts.mindset
+    ? `\n【你开口之前已经想清楚的】\n${opts.mindset}\n（这段是你脑子里的推演，读者看不到。不要复述它，不要说"我上面想到"，直接开口。）\n`
+    : '';
+  const cutoff = opts.asOf
+    ? `\n【时间闸门】今天是 ${today}，你只知道这一天之前发生的事。之后的任何事你都不知道——包括后来买了什么、后来股价怎么走、谁去世了。被问到就说"这我还没法知道"。`
+    : '';
+  const about = `沃伦·巴菲特 ${C.meta.years[0]}-${C.meta.years[1]} 年写给合伙人和股东的 ${C.meta.letters} 封信原文（${Math.round(C.meta.chars / 10000)} 万字）`;
+  const reader = `【关于这位读者，你记得】\n${mem || '（还没有。聊的过程中可以用 remember 工具记下他的背景和偏好）'}`;
+  const work = `【工作方式】
+- 你是 agent：自己决定查什么、查几次（上限 ${MAX_ROUNDS} 轮）。不要一次工具都不调用就去回答他讲过什么。
+- 节奏：第一轮就把所有可能用得上的检索一次性并行发起（一次消息里调 2-4 个工具），不要一个一个排队等。第 4 轮起必须开始收尾，别再开新的检索。
+- 第一轮证据不够可以换关键词再查，或改查概念档案、公司轨迹、认错档案。
+- 读者是聪明但没有金融背景的人：术语第一次出现时补一句大白话解释。`;
+
+  if (mode === 'simulate') {
+    return `你是${NAME}的虚拟化身。今天是 ${today}。桌上摊着 ${about}，另有 ${SITUATION ? SITUATION.CASES.length : 0} 条整理好的历史决策案例，只有工具能翻开给你看。${cutoff}
+
+读者会告诉你今天发生的一件事（A 股的公司或市场），问「你会怎么想」。用第一人称「我」回答，像本人坐在桌边说话，平静、具体、不夸张。
+
+【最重要的规矩：答案必须分成两区，一个字都不许混】
+严格按下面两个标题输出，顺序不能变，标题各占一行：
+【他确实说过】
+【按这些依据推演】
+
+第一区只放工具返回里逐字不改的我的原话，每句后面照抄工具给的引用标记 [[信|段]]。工具没给原话，这一区就写「这些信里没查到直接对应的原话」，绝不替我补一句。
+第二区才是我面对今天这件事的推演。在这一区里：
+- 不许出现任何 [[...]] 引用标记，不许用引号引我的原话，不许写「我说过」「我在某年写过」这种冒充原话的句式；
+- 推演要标出它依据了哪几条历史案例，用 〔案例id〕 这个格式（id 来自 match_situation / case_detail，至少标 2 条）；
+- 标了「⚠ 反向对照」的案例只能拿来对比，不能当成本次判断的依据，要说明它相反在哪；
+- 今天的事实只来自读者给的事件描述或工具返回，不许自己编发生了什么，也不许编股价、数字、公司名；
+- 收尾用一句话说清「这是按旧判断推的，不是我对今天这件事的承诺」。
+
+【其他铁律】
+1. 数字、年份、价格一律来自工具输出，不得推算拼凑。
+2. ${C.meta.years[1]} 年之后的事要用 web_search 查，答案里必须说清这是网络来源，不能和我信里的话混在一起。
+3. 遇到「明天涨不涨」「给我一个代码」这类，按我自己说过的规矩拒绝预测和荐股。但读者问「这件事你怎么看、你会怎么做」，那是另一回事：必须给一个明确立场——买、不买、还是等——不许拿「我不预测」当挡箭牌蒙过去。他一辈子拒的是预测大盘和短期走势，从来不是拒绝就一家公司给出判断。能力圈内、价格合适的时候，他敢把话说得很硬。
+4. 工具返回里标了「概述，不可逐字引用」的文字，只能用来理解情形，不能当原话。
+5. 两区合计 600-900 字，宁短勿长；第一区宁可只有一两句，也不要拿概述凑数。
+${voiceBlock(opts.noVoice)}
+${BOUNDS}
+${work}
+- 第一轮先调 match_situation（把今天这件事对到旧判断），同时并行发起可能用得上的 search_letters / concept_profile。想细看某条旧案例就调 case_detail。
+
+${reader}
+${stanceBlock}${mindBlock}
+记住：第二区是模拟推演，不是我说过的话。页面会替你标注这一点，但你自己也不许把两区搅在一起。`;
+  }
+
+  return `你是「巴菲特午餐会」的主持人。桌上摊着 ${about}，只有工具能把它翻开给你看。
 
 【铁律】
 1. 凡是"他说过什么"，必须来自工具返回的原文，并且逐字引用。不许改写，不许用你的背景知识补句子。
@@ -524,22 +801,67 @@ function systemPrompt(memNotes) {
 3. 每段原文证据后面都跟它的引用标记（形如 [[1988 巴菲特致股东信|12]] 或 [[web|网址]]），照抄工具输出，一个字都不要改。
 4. ${C.meta.years[1]} 年之后的事要用 web_search 查，答案里必须说清这是网络来源，不能和他信里写的话混在一起。
 5. 数字（回报率、价格、年份、持股比例）一律来自工具输出，不得推算拼凑。
-
-【工作方式】
-- 你是 agent：自己决定查什么、查几次（上限 ${MAX_ROUNDS} 轮）。不要一次工具都不调用就去回答他讲过什么。
-- 节奏：第一轮就把所有可能用得上的检索一次性并行发起（一次消息里调 2-4 个工具），不要一个一个排队等。第 4 轮起必须开始收尾，别再开新的检索。
-- 第一轮证据不够可以换关键词再查，或改查概念档案、公司轨迹、认错档案。
-- 读者是聪明但没有金融背景的人：术语第一次出现时补一句大白话解释。
+${voiceBlock(opts.noVoice)}
+${BOUNDS}
+${work}
 - 结构：先一句结论，再铺原文证据，最后一句"所以这意味着什么"。控制在 600-900 字以内，写不完就挑最重要的说，宁短勿长。
 
-【关于这位读者，你记得】
-${mem || '（还没有。聊的过程中可以用 remember 工具记下他的背景和偏好）'}
+${reader}
 
-今天是 ${nowStamp().slice(0, 10)}。`;
+今天是 ${today}。`;
 }
+
+/* ---------------- 先想后说 ----------------
+   一次非流式短调用，专门产出"开口之前的内部推演"。三个约束：
+     1. 它看不到读者，读者也看不到它 —— 所以可以写得粗糙、可以自我怀疑；
+     2. 必须落到六问上，否则模型会写成一段正确的废话；
+     3. 允许写"我不知道"，这一栏反而是最像他的地方。
+   这一步和主回答分开调用的理由:混在一轮里，模型会把推演直接说出来，而且会为了
+   让推演好看而扭曲判断。分开调，主回答只拿结论，不拿过程。 */
+const MINDSET_Q = [
+  '这件事落在我的能力圈里吗？如果不在，我该承认到什么程度？',
+  '护城河有没有真的被改变，还是只是价格在动？',
+  '管理层和资本配置这一层，有没有出现我无法信任的迹象？',
+  '价格相对内在价值在什么位置？我有没有在用"便宜"掩盖"看不懂"？',
+  '我历史上最像的三次是哪三次？（给案例 id）那次我错在哪？',
+  '这一次我最容易犯的错是什么？我会不会在替自己想买的理由找证据？',
+];
+
+async function buildMindset(o) {
+  const { question, apiKey, model, asOf, anon } = o;
+  const NAME = anon ? '一位美国投资家' : '沃伦·巴菲特';
+  const sys = `你在扮演${NAME}。读者刚把一件事摆在你面前，你还没开口。
+先用你自己的方式把这件事想清楚，写成给自已看的笔记。
+
+要求：
+- 六问逐条回答，每条 1-2 句，可以写"不知道""看不出来"。
+- 不许写套话（"需要综合考虑""要辩证地看"），不许写给人看的客套。
+- 涉及历史判断时，尽量给出你记得的年份或案例名；记不清就说记不清。
+- 总长 300-450 字。只输出笔记正文，不要标题，不要开场白。`;
+  const usr = `今天：${asOf || nowStamp().slice(0, 10)}\n读者说的事：${question}\n\n六问：\n` +
+    MINDSET_Q.map((q, i) => (i + 1) + '. ' + q).join('\n');
+  try {
+    const r = await fetch(DEEPSEEK, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model, messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }],
+        temperature: 0.5, max_tokens: 900, stream: false,
+      }),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const t = (j.choices && j.choices[0] && j.choices[0].message.content || '').trim();
+    return t || null;
+  } catch (e) {
+    return null;   /* 想不出来也得能开口：这一层失败就退回直接答 */
+  }
+}
+
 
 /* ---------------- DeepSeek 流式调用 ---------------- */
 async function streamChat(payload, apiKey, onDelta) {
+  const _t0 = Date.now();
   const r = await fetch(DEEPSEEK, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
@@ -552,7 +874,7 @@ async function streamChat(payload, apiKey, onDelta) {
     throw new Error(msg);
   }
   const dec = new TextDecoder();
-  let buf = '';
+  let buf = '', firstTok = null;
   const acc = { content: '', reasoning: '', toolCalls: [], finish: null, usage: null };
   for await (const chunk of r.body) {
     buf += dec.decode(chunk, { stream: true });
@@ -570,7 +892,12 @@ async function streamChat(payload, apiKey, onDelta) {
       if (!ch) continue;
       if (ch.finish_reason) acc.finish = ch.finish_reason;
       const d = ch.delta || {};
-      if (d.content) { acc.content += d.content; if (onDelta) onDelta(d.content); }
+      if (d.content) {
+        acc.content += d.content;
+        /* 首个 token 到达的时间：评测里叫 ttft，用户体感上就是「多久开始吐字」 */
+        if (firstTok === null) firstTok = Date.now() - _t0;
+        if (onDelta) onDelta(d.content);
+      }
       if (d.reasoning_content) acc.reasoning += d.reasoning_content;
       if (d.tool_calls) {
         for (const tc of d.tool_calls) {
@@ -584,6 +911,8 @@ async function streamChat(payload, apiKey, onDelta) {
       }
     }
   }
+  acc.ms = Date.now() - _t0;
+  acc.ttft = firstTok;
   return acc;
 }
 
@@ -598,6 +927,10 @@ function toolSummary(name, args) {
     case 'corrections': return '查他承认过的错' + (a.topic ? '（' + a.topic + '）' : '');
     case 'web_search': return '联网搜「' + a.query + '」';
     case 'open_url': return '打开网页 ' + String(a.url || '').slice(0, 50);
+    case 'match_situation': return '把今天这件事对到历史旧判断';
+    case 'case_detail': return '打开旧案例 ' + a.case_id;
+    case 'stance_timeline': return '查「' + a.name + '」的立场演变';
+    case 'talk_search': return '翻股东大会问答「' + a.query + '」';
     case 'remember': return '记下：' + a.note;
     default: return name;
   }
@@ -613,33 +946,65 @@ function withTimeout(p, ms, msg) {
 /* ---------------- 会话与长期记忆 ---------------- */
 const SESSIONS = new Map();
 function getSession(id) {
-  if (!SESSIONS.has(id)) SESSIONS.set(id, { msgs: [], cited: {} });
+  if (!SESSIONS.has(id)) SESSIONS.set(id, { msgs: [], cited: {}, stances: [] });
   return SESSIONS.get(id);
 }
 
 async function runAgent(ctx) {
-  const { message, session, model, web, emit, key } = ctx;
+  const { message, session, model, web, emit, key, mode } = ctx;
+  const asOf = /^\d{4}(-\d{2}-\d{2})?$/.test(String(ctx.asOf || '')) ? String(ctx.asOf) : '';
+  const anon = !!ctx.anon;
   /* 密钥由 emitSSE 按免费额度规则选好再传进来；这里只管报「确实没有」的情况 */
   const apiKey = key;
   if (!apiKey) throw new Error('这台机器上没有配置 DeepSeek 密钥。本机用就写进 ' +
     KEY_FILES.join(' 或 ') + '；公网访客请在页面上填自己的密钥。');
 
   const mem = await readMemory();
-  const tools = web ? TOOLS : TOOLS.filter(t => t.function.name !== 'web_search' && t.function.name !== 'open_url');
+  let tools = web ? TOOLS.slice() : TOOLS.filter(t => t.function.name !== 'web_search' && t.function.name !== 'open_url');
+  /* 情形匹配只给分身用；考据模式的工具集保持原样，别把旧评测的口径搅乱。 */
+  if (mode !== 'simulate') tools = tools.filter(t => t.function.name !== 'match_situation' && t.function.name !== 'case_detail');
+  /* 回测：联网和"几十年揉在一起"的档案必须摘掉，否则时间闸门形同虚设 */
+  if (asOf) tools = tools.filter(t => ['web_search', 'open_url', 'concept_profile', 'company_timeline'].indexOf(t.function.name) < 0);
   const s = getSession(session);
   s.msgs.push({ role: 'user', content: message });
   if (s.msgs.length > 16) s.msgs = s.msgs.slice(-16);
 
-  const history = [{ role: 'system', content: systemPrompt(mem.notes) }].concat(s.msgs);
+  /* 先想后说：只给分身用。想不出来（超时、报错）就跳过，不挡着开口。
+     前端会收到一条 step，读者看到的是「他在想」，不是六问全文。 */
+  if (mode === 'simulate' && ctx.wantMindset !== false) {
+    emit('step', { text: '先在心里过一遍：能力圈 / 护城河 / 管理层 / 价格 / 最像的三次 / 我容易错在哪' });
+    ctx.mindsetNote = await buildMindset({ question: message, apiKey, model, asOf, anon });
+  }
+
+  const history = [{ role: 'system', content: systemPrompt(mem.notes, mode, {
+    asOf, anon,
+    mindset: ctx.mindsetNote || null,
+    stances: s.stances.map(x => ({ text: x.text })),
+  }) }].concat(s.msgs);
 
   let rounds = 0, calls = 0, final = null;
   const allSources = [];
+  /* ---- trace ----
+     一次问答 = 一个 trace，里面挂一串 span（每轮模型、每次工具）。
+     落盘后评测脚本就能离线反复判分，改判分逻辑不用重跑 agent（重跑是真金白银）。 */
+  const spans = [];
+  const t0 = Date.now();
+  let ttft = null;
+  const onDelta = txt => {
+    if (ttft === null) ttft = Date.now() - t0;
+    emit('delta', { text: txt });
+  };
 
   for (rounds = 1; rounds <= MAX_ROUNDS; rounds++) {
     const payload = { model, messages: history, tools, stream: true, max_tokens: 2400, temperature: 0.3 };
     /* 一边收 token 一边发给前端；万一这一轮改主意要去调工具，
        说明开头那半句话是"我来查查"之类的过场，用 reset 让前端把它抹掉。 */
-    const acc = await streamChat(payload, apiKey, txt => emit('delta', { text: txt }));
+    const acc = await streamChat(payload, apiKey, onDelta);
+    spans.push({ i: spans.length, type: 'llm', round: rounds, ms: acc.ms, ttft: acc.ttft,
+      finish: acc.finish, prompt_tokens: (acc.usage || {}).prompt_tokens || 0,
+      completion_tokens: (acc.usage || {}).completion_tokens || 0,
+      out_chars: (acc.content || '').length,
+      wants_tools: acc.toolCalls.filter(Boolean).map(tc => tc.name) });
 
     if (!acc.toolCalls.length) {
       final = { content: acc.content, usage: acc.usage, truncated: acc.finish === 'length' };
@@ -668,12 +1033,17 @@ async function runAgent(ctx) {
       let argsObj = {};
       try { argsObj = tc.args ? JSON.parse(tc.args) : {}; } catch (e) { argsObj = {}; }
       emit('step', { text: toolSummary(tc.name, argsObj) });
+      const ts0 = Date.now();
       let res;
       try {
-        res = await withTimeout(toolCall(tc.name, argsObj), 25000, tc.name + ' 超时');
+        res = await withTimeout(toolCall(tc.name, argsObj, asOf), 25000, tc.name + ' 超时');
       } catch (e) {
         res = { text: '工具出错：' + e.message };
       }
+      spans.push({ i: spans.length, type: 'tool', round: rounds, name: tc.name,
+        args: argsObj, ms: Date.now() - ts0, out_chars: (res.text || '').length,
+        n_sources: (res.sources || []).length,
+        error: /^工具出错/.test(res.text || '') ? (res.text || '').slice(0, 120) : null });
       const sources = (res.sources || []).filter(x => {
         const key = x.kind === 'letter' ? x.l + '|' + x.b : 'web|' + x.url;
         if (s.cited[key]) return false;
@@ -689,12 +1059,32 @@ async function runAgent(ctx) {
   if (!final) {
     /* 循环用尽还没张口：逼它把已经查到的东西说完 */
     history.push({ role: 'user', content: '（工具额度已用尽，请立刻基于你手上的原文作答，并附上引用标记）' });
-    const acc = await streamChat({ model: model, messages: history, stream: true, max_tokens: 2400, temperature: 0.3 }, apiKey, t => emit('delta', { text: t }));
+    const acc = await streamChat({ model: model, messages: history, stream: true, max_tokens: 2400, temperature: 0.3 }, apiKey, onDelta);
+    spans.push({ i: spans.length, type: 'llm', round: rounds, forced: true, ms: acc.ms, ttft: acc.ttft,
+      finish: acc.finish, prompt_tokens: (acc.usage || {}).prompt_tokens || 0,
+      completion_tokens: (acc.usage || {}).completion_tokens || 0,
+      out_chars: (acc.content || '').length, wants_tools: [] });
     emit('usage', acc.usage || {});
     final = { content: acc.content, usage: acc.usage, truncated: acc.finish === 'length' };
   }
 
   const text = final.content || '';
+
+  /* 立场账本：把这轮推演的第一句记下来，下一轮塞回提示词。
+     为什么机械截取而不让模型自己总结：模型「总结自己刚说过什么」经常总结成
+     更漂亮但不等于原意的话，下一轮就拿这句漂亮话当立场，越走越偏。
+     第一句是他真正下判断的那句，短、硬、可对账。 */
+  if (mode === 'simulate') {
+    const h2 = text.indexOf('【按这些依据推演】');
+    if (h2 >= 0) {
+      const body = text.slice(h2 + '【按这些依据推演】'.length).trim();
+      const first = (body.split(/[。！？\n]/)[0] || '').trim();
+      if (first.length >= 8) {
+        s.stances.push({ text: first.slice(0, 80), day: asOf || nowStamp().slice(0, 10), at: Date.now() });
+        while (s.stances.length > 12) s.stances.shift();
+      }
+    }
+  }
   /* 工具这一路上翻过很多材料，但只有答案里真正挂了引用标记的才算"本次引用"。
      按 marking 反查，来源清单才不会比答案本身长。 */
   const used = allSources.filter(x => {
@@ -706,7 +1096,9 @@ async function runAgent(ctx) {
 
   s.msgs.push({ role: 'assistant', content: final.content });
   if (s.msgs.length > 16) s.msgs = s.msgs.slice(-16);
-  return { rounds: rounds, calls: calls, usage: final.usage };
+  return { rounds: rounds, calls: calls, usage: final.usage,
+    spans: spans, ttft: ttft, ms: Date.now() - t0,
+    answer: text, sources: used, all_sources: allSources };
 }
 
 /* 服务端自带的密钥。有它，就是「本机模式」：谁来都不用填密钥，也只花主人的钱。 */
@@ -754,7 +1146,9 @@ const server = http.createServer(async (req, res) => {
       const own = await serverKey();
       /* keyMode: builtin=服务端自带密钥（免费额度随它发放）；byo=没有，访问者要填自己的 */
       const out = { ok: true, key: !!own, keyMode: own ? 'builtin' : 'byo',
-        docs: DOCS.length, letters: C.meta.letters, models: ['deepseek-v4-pro', 'deepseek-flash'] };
+        docs: DOCS.length, letters: C.meta.letters,
+        cases: SITUATION ? SITUATION.CASES.length : 0,
+        models: ['deepseek-v4-pro', 'deepseek-flash'] };
       if (own) {
         const vid = String(u.searchParams.get('vid') || '').slice(0, 64) || ('ip:' + (req.socket.remoteAddress || '?'));
         out.freeLeft = await freeLeft(vid);
@@ -784,6 +1178,79 @@ function json(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
+/* ---------------- trace 落盘 ----------------
+   一次问答 = 一个 trace，按天写一个 .jsonl，一行一条。
+   判分是第二遍独立跑的：eval/score.js 读这些行算分，改判分逻辑不用重跑 agent
+   （重跑一次评测是真金白银）。
+   纪律：全量落、不抽样；不落密钥、不落访客号明文（只存哈希）、不落 IP。 */
+const TRACE_DIR = path.join(ROOT, 'eval', 'traces');
+let _traceQ = Promise.resolve();
+function appendTrace(rec) {
+  _traceQ = _traceQ.then(async () => {
+    try {
+      await fsp.mkdir(TRACE_DIR, { recursive: true });
+      await fsp.appendFile(path.join(TRACE_DIR, rec.date + '.jsonl'), JSON.stringify(rec) + '\n', 'utf8');
+    } catch (e) { console.error('[trace] 写入失败：' + e.message); }
+  });
+  return _traceQ;
+}
+function hashId(s) { return crypto.createHash('sha256').update(String(s || '')).digest('hex').slice(0, 16); }
+/* 答案里的引用标记 [[信|段]] / [[web|url]] —— 判「引用存不存在」就从这里下手。
+   注意「信」那一截是信件 id（形如「2018 巴菲特致股东信」），不是数字下标。 */
+const CITE_RE = /\[\[([^|\]]+)\|(\d+)\]\]|\[\[web\|([^\]]+)\]\]/g;
+function parseCites(text) {
+  const out = []; let m;
+  CITE_RE.lastIndex = 0;
+  while ((m = CITE_RE.exec(text))) {
+    out.push(m[3] !== undefined ? { kind: 'web', url: m[3] } : { kind: 'letter', l: m[1], b: +m[2] });
+  }
+  return out;
+}
+
+/* 把这一问写成一行 trace。判分脚本只读它，不再碰 agent。
+   q 里的 run_id / qid / layer 是评测跑批时带进来的；线上流量没有，就记 live。 */
+function writeTrace(q, vid, keySource, model, info, errMsg) {
+  try {
+    return appendTrace(buildTrace(q, vid, keySource, model, info, errMsg));
+  } catch (e) {
+    /* 记 trace 是旁支，记失败绝不能影响这次问答 —— 更不能让服务挂掉 */
+    console.error('[trace] 组装失败：' + e.message);
+    return Promise.resolve();
+  }
+}
+
+function buildTrace(q, vid, keySource, model, info, errMsg) {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const answer = info ? (info.answer || '') : '';
+  const rec = {
+    ts: d.getTime(),
+    date: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()),
+    time: pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()),
+    run_id: String(q.run_id || 'live').slice(0, 40),
+    qid: String(q.qid || '').slice(0, 40),
+    layer: String(q.layer || '').slice(0, 16),
+    session: String(q.session || 'default').slice(0, 40),
+    vid_hash: hashId(vid),
+    question: String(q.message || '').slice(0, 2000),
+    model: model, web: q.web !== false, mode: q.mode === 'simulate' ? 'simulate' : 'archive',
+    key_source: keySource,
+    spans: info ? info.spans : [],
+    sources: info ? info.sources : [],
+    all_sources: info ? (info.all_sources || []).length : 0,
+    citations: parseCites(answer),
+    answer: answer,
+    usage: (info && info.usage) || null,
+    ms: info ? info.ms : null,
+    ttft: info ? info.ttft : null,
+    rounds: info ? info.rounds : null,
+    calls: info ? info.calls : null,
+    truncated: info ? !!info.truncated : null,
+    error: errMsg || null
+  };
+  return appendTrace(rec);
+}
+
 function emitSSE(res, q, ip) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
@@ -792,17 +1259,26 @@ function emitSSE(res, q, ip) {
   });
   const emit = (type, data) => { res.write('event: ' + type + '\ndata: ' + JSON.stringify(data) + '\n\n'); };
   (async () => {
-    /* 这两个要活在 try 外面：catch 里退款时还用得上 */
-    let vid = '', usedFree = false;
+    /* 这三个要活在 try 外面：catch 里退款、写 trace 时还用得上。
+       （keySource 曾经写在 try 里，一次问答报错就 ReferenceError 把整个服务带崩过，
+        所以现在和 vid / usedFree 一起提到外面。） */
+    let vid = '', usedFree = false, keySource = 'none';
+    const model = q.model === 'pro' ? 'deepseek-v4-pro' : 'deepseek-flash';
     try {
-      emit('start', { model: q.model === 'pro' ? 'deepseek-v4-pro' : 'deepseek-flash' });
+      emit('start', { model: model });
       /* ---- 选密钥 ----
          vid 是前端存在浏览器里的随机访客号；没带来就按 IP 记账。 */
       vid = String(q.vid || '').slice(0, 64) || ('ip:' + (ip || '?'));
       const byo = looksLikeKey(q.key) ? String(q.key).trim() : '';
       const own = await serverKey();
-      let apiKey = null, keySource = 'none';
-      if (own && (await freeLeft(vid)) > 0) {
+      /* keySource 不能在这里再声明一次：那会遮蔽外层，catch 里写 trace 时拿到的是
+         初始值 'none'，等于记了一笔假账。 */
+      let apiKey = null;
+      /* 评测跑批专用：EVAL_NO_QUOTA=1 起服务时，既不走访客免费额度、也不撞每日上限。
+         不加这个开关，跑一轮 100+ 问的评测会把免费池烧穿，之后真访客全被挡住。 */
+      if (process.env.EVAL_NO_QUOTA === '1' && (byo || own)) {
+        apiKey = byo || own; keySource = 'eval';
+      } else if (own && (await freeLeft(vid)) > 0) {
         /* 还在免费额度内：哪怕访客填了自己的密钥也先用站长的（额度不用白不用，
            访客的密钥留给额度用完之后） */
         apiKey = own; keySource = 'free'; usedFree = true;
@@ -826,16 +1302,22 @@ function emitSSE(res, q, ip) {
         message: String(q.message || '').slice(0, 2000),
         session: String(q.session || 'default').slice(0, 40),
         /* 默认走快的那个：坐着聊天等 40 秒太长。想要更细的推理再选 pro。 */
-        model: q.model === 'pro' ? 'deepseek-v4-pro' : 'deepseek-flash',
+        model: model,
         web: q.web !== false,
+        mode: q.mode === 'simulate' ? 'simulate' : 'archive',
+        asOf: q.as_of || '',
+        anon: q.anon === true || q.anon === 1,
+        wantMindset: q.mindset !== false,
         key: apiKey,
         emit: emit
       });
       emit('done', info);
+      writeTrace(q, vid, keySource, model, info, null);
     } catch (e) {
       /* 这一问没成，免费额度退回去 —— 不能让人白花一次 */
       if (usedFree) await refundFree(vid);
       emit('error', { message: e.message });
+      writeTrace(q, vid, keySource, model, null, e.message);
     } finally {
       res.end();
     }
@@ -845,7 +1327,7 @@ function emitSSE(res, q, ip) {
 /* 绑定地址：本机跑只听 127.0.0.1（外人碰不到你的密钥）；
    发布到线上时运行环境会注入 PORT，那时必须听 0.0.0.0，否则反代连不上。
    线上实例没有自带密钥，走访问者自带密钥，也不存在蹭额度的问题。 */
-server.listen(PORT, DEPLOY ? '0.0.0.0' : '127.0.0.1', async () => {
+if (require.main === module) server.listen(PORT, DEPLOY ? '0.0.0.0' : '127.0.0.1', async () => {
   /* 这里必须真去读一次密钥：keyMode() 只看缓存，启动时缓存还是空的，会误报「未配置」 */
   const hasKey = !!(await serverKey());
   console.log('');
@@ -855,3 +1337,6 @@ server.listen(PORT, DEPLOY ? '0.0.0.0' : '127.0.0.1', async () => {
   console.log('  密钥： ' + (hasKey ? '已配置 —— 每位访客免费 ' + FREE_PER_VISITOR + ' 问，之后用访客自己的密钥' : '未配置 —— 访问者需在页面上填自己的密钥'));
   console.log('');
 });
+
+/* 给评测用：导出的是线上同一个函数，不是另写一份 —— 否则测出来的不是真东西。 */
+module.exports = { systemPrompt, voiceBlock, buildMindset, toolCall, searchDocs, DOCS, C, L, CT, SITUATION, TALK, VOICE, getSession };
