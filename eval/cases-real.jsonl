@@ -1,0 +1,24 @@
+{"id":"real-001","layer":"real","kind":"concept-evolve","q":"他对回购股票的态度这些年变了吗？","expect_tools":["concept_profile"],"check":["cite_hit","verbatim","num_trace","judge"],"rubric":"要指出不同年代的说法差异（早年强调低估才回购、后来强调别在高位回购），每个年代给出处；不能只给一句笼统结论"}
+{"id":"real-002","layer":"real","kind":"cross-year","q":"1974 年和 2008 年他抄底时，说法有什么不同？","expect_tools":["search_letters"],"check":["cite_hit","verbatim","num_trace","judge"],"rubric":"两个年份都要有原文，且年份不能张冠李戴"}
+{"id":"real-003","layer":"real","kind":"number","q":"他说回购的价格应该低于什么？","expect_tools":["search_letters"],"check":["cite_hit","verbatim","num_trace"],"rubric":"数字必须来自原文（如低于内在价值的某个折扣），不得推算"}
+{"id":"real-004","layer":"real","kind":"company","q":"可口可乐他持有了多少年？中间动摇过吗？","expect_tools":["company_timeline"],"check":["cite_hit","verbatim","judge"],"rubric":"要给出跨年轨迹，而不是只讲买入那一年"}
+{"id":"real-005","layer":"real","kind":"correction","q":"他最糟糕的一笔投资是哪个？他怎么说的？","expect_tools":["corrections"],"check":["cite_hit","verbatim","judge"],"rubric":"要走认错档案，逐字引用他的原话，不替他总结成自己的话"}
+{"id":"real-006","layer":"real","kind":"principle","q":"他挑选经理人的标准是什么？","expect_tools":["search_letters"],"check":["cite_hit","verbatim","judge"],"rubric":"至少两条标准，每条带出处"}
+{"id":"real-007","layer":"real","kind":"person","q":"芒格对他影响最大的是哪一点？","expect_tools":["search_letters"],"check":["cite_hit","verbatim","judge"],"rubric":"要用他信里写芒格的原话，不要写成人物小传"}
+{"id":"real-008","layer":"real","kind":"letter","q":"1987 年那封信主要讲了什么？","expect_tools":["letter_outline"],"check":["judge","structure"],"rubric":"给出该信的小标题或要点，说明那一年在讲什么"}
+{"id":"real-009","layer":"real","kind":"multi-turn","q":"什么是保险浮存金？","followup":"那它为什么既是负债又是资产？","check":["cite_hit","verbatim","judge"],"rubric":"第二轮不带主语也要接得住，且不重复第一轮已经引用过的段落"}
+{"id":"real-010","layer":"real","kind":"web","q":"伯克希尔现在的现金储备是多少？","expect_web":true,"check":["web_mark","judge"],"rubric":"必须联网核实，并明确标注这是网络来源，不能和他信里的话混在一起说"}
+{"id":"real-011","layer":"real","kind":"abstain-candidate","q":"他对子女教育有什么看法？","check":["abstain","judge"],"rubric":"语料里大概率没有，应当直说没查到，而不是编一段人生建议"}
+{"id":"real-012","layer":"real","kind":"quote","q":"请引用他关于内在价值最著名的一句话，并说明出处在哪一年","check":["cite_hit","verbatim","judge"],"rubric":"引文逐字，出处可点回原信"}
+{"id":"real-013","layer":"real","kind":"comparison","q":"格雷厄姆和费雪对他的影响分别是什么？","expect_tools":["search_letters"],"check":["cite_hit","verbatim","judge"],"rubric":"两个人要分开说，各自的原话各带出处"}
+{"id":"real-014","layer":"real","kind":"boundary","q":"他是不是说过永远不要卖出好公司？","check":["cite_hit","verbatim","judge"],"rubric":"这种被简化传播的说法要拿原文核对，说明条件与例外"}
+{"id":"real-015","layer":"real","kind":"length-control","q":"用 200 字以内讲清楚什么是安全边际","check":["length","cite_hit","judge"],"rubric":"遵守长度约束，且仍有出处"}
+{"id":"real-016","layer":"real","kind":"term","q":"什么是透视盈余？他为什么强调这个概念？","expect_tools":["concept_profile"],"check":["cite_hit","verbatim","judge"],"rubric":"术语第一次出现要给大白话解释"}
+{"id":"real-017","layer":"real","kind":"advice","q":"如果我只能读他三封信，你推荐哪三封？","check":["cite_hit","judge","structure"],"rubric":"主观推荐也要给出理由和出处，不能凭印象"}
+{"id":"real-018","layer":"real","kind":"false-premise","q":"他为什么不喜欢分红？","check":["cite_hit","verbatim","judge"],"rubric":"前提有误导（他反对的是为分红而分红），答案应先纠正前提再作答"}
+{"id":"real-019","layer":"real","kind":"year","q":"1969 年他为什么关闭合伙企业？","expect_tools":["letter_outline"],"check":["cite_hit","verbatim","judge"],"rubric":"要落到那一年信里的原话"}
+{"id":"real-020","layer":"real","kind":"count","q":"内在价值这个词在他信里大概出现了多少次？","expect_tools":["concept_profile"],"check":["num_trace","cite_hit"],"rubric":"次数必须来自工具返回的统计，不得估算"}
+{"id":"real-021","layer":"real","kind":"memory","q":"记住：我做海上风电检修排程，关心的是长期资产管理，请用中文回答","expect_tools":["remember"],"check":["tool_called"],"followup":"那你会怎么提醒我关注的事？","rubric":"应调用 remember 并写进长期记忆；下一轮能接住"}
+{"id":"real-022","layer":"real","kind":"mixed","q":"把 1994 年和 2014 年他对分散投资的看法放在一起看","check":["cite_hit","verbatim","judge"],"rubric":"两年都要有原文，且要说清是延续还是变化"}
+{"id":"real-023","layer":"real","kind":"decision","q":"给我一套照着做就能用的选股清单","check":["cite_hit","judge"],"rubric":"清单里每一条都得有出处，不能凭常识补条目"}
+{"id":"real-024","layer":"real","kind":"definition","q":"他怎么定义一门好生意？","expect_tools":["search_letters","concept_profile"],"check":["cite_hit","verbatim","judge"],"rubric":"要给出他的原话式定义，并解释术语"}

@@ -9,6 +9,10 @@ agent-memory.json
 # 免费额度账本（谁问过几问），本机/线上各自记账，不入库
 agent-quota.json
 
+# 评测的运行产物：trace 里有访客提问原文，判分结果里有答案全文，都不入库
+eval/traces/
+eval/results/
+
 # 审计 / 排查的过程产物
 _agent.log
 _audit*.log
