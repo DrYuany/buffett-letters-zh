@@ -1175,12 +1175,12 @@ function systemPrompt(memNotes, mode, opts) {
 
 【我怎么量它】
 2 到 4 个角度。每个角度写三样东西，缺一不可：
-（一）尺子：这条判断标准从哪条旧判断来的——标 〔案例id〕，或者直接标 [[信|段]]，两种都行，但必须是工具真返回过的；再用一句话说清那把尺子量的是什么；
+（一）尺子：这条判断标准从哪条旧判断来的。三种标法任选，但必须是工具真返回过的：标 〔案例id〕；标 [[信|段]]；写清「哪一年、什么场合」（如 1999 年股东大会）或「哪个工具算的」（如 peer_compare）。股东大会和演讲的语料没有信件标记，那种情形就用第三种，绝不许自己编一个 [[ ]]；
 （二）数字：这把尺子量在这家公司身上，读数是多少；
 （三）判断：这个读数说明生意变好了还是变坏了。
 一个角度写完再写下一个，不要揉成一大段。示范：
-- 提价能力（〔case_xxx〕）：毛利率 89.6%，五年没掉下过 88%，说明提价没把经销商逼走。但营收只增 1.8%，量已经不动了，增长只剩提价一条腿。这是好生意变钝，不是变坏。
-- 资本消耗（〔case_yyy〕）：营收增 56%，资本开支同期增多少、负债率有没有升，直接决定这增长是白赚的还是买来的。
+- 提价能力（〔rule-148〕）：毛利率 89.6%，五年没掉下过 88%，说明提价没把经销商逼走。但营收只增 1.8%，量已经不动了，增长只剩提价一条腿。这是好生意变钝，不是变坏。
+- 资本消耗（[[1997 巴菲特致股东信|126]]）：营收增 56%，资本开支同期增多少、负债率有没有升，直接决定这增长是白赚的还是买来的。
 
 【所以】
 一句明确的话：买、不买、等，或者「看不懂，不碰」。不许「因人而异」「需要综合考虑」「建议关注」。
@@ -1200,7 +1200,7 @@ function systemPrompt(memNotes, mode, opts) {
 3b. 如果 match_situation 返回的全是「原则」而没有具体决策，就在那个角度上明说「这是原则，不是某次具体决策」，不要把它包装成一次先例。
 4. 读者问「明天涨不涨」「给我一个代码」「现在满仓行不行」，照样拒绝——那是预测和荐股。但问「这家公司怎么样」「现在值不值得买」，那是判断，必须给明确立场。他一辈子拒的是预测大盘和短期走势，从不拒绝对一家公司下判断。
 5. 工具返回里标了「概述，不可逐字引用」的文字，只能用来理解情形，不能当原话。
-6. 全文 800-1100 字。【我怎么量它】不能少于两个角度。写不下时先砍【他确实说过】，再砍【我可能错在哪】的铺垫，保住事实和角度。
+6. 全文 1000-1400 字，宁可短。【我怎么量它】2 到 3 个角度，不要凑第四个；【现在的事实】3 到 5 条，不要凑第六条。写不下时先砍【他确实说过】的句数，再压事实条数——【所以】和【我可能错在哪】一段都不能少，被截断比写短更糟。
 ${voiceBlock(opts.noVoice)}
 ${BOUNDS}
 ${work}
@@ -1424,8 +1424,12 @@ async function runAgent(ctx) {
     emit('delta', { text: txt });
   };
 
+  /* 分身要写满五段，而且这类模型先花两三千 token 在推理上，4096 的预算被推理吃掉一半。
+     实测有 5% 的分身答案卡在 length：写到【我怎么量它】中间就停，连【所以】都没出来。
+     考据模式没这个问题（结构短），保持原值，别顺手把成本抬上去。 */
+  const MAXTOK = mode === 'simulate' ? 8192 : 4096;
   for (rounds = 1; rounds <= MAX_ROUNDS; rounds++) {
-    const payload = { model, messages: history, tools, stream: true, max_tokens: 4096, temperature: 0.3 };
+    const payload = { model, messages: history, tools, stream: true, max_tokens: MAXTOK, temperature: 0.3 };
     /* 一边收 token 一边发给前端；万一这一轮改主意要去调工具，
        说明开头那半句话是"我来查查"之类的过场，用 reset 让前端把它抹掉。 */
     const acc = await streamChat(payload, apiKey, onDelta);
@@ -1488,8 +1492,10 @@ async function runAgent(ctx) {
 
   if (!final) {
     /* 循环用尽还没张口：逼它把已经查到的东西说完 */
-    history.push({ role: 'user', content: '（工具额度已用尽，请立刻基于你手上的原文作答，并附上引用标记）' });
-    const acc = await streamChat({ model: model, messages: history, stream: true, max_tokens: 4096, temperature: 0.3 }, apiKey, onDelta);
+    history.push({ role: 'user', content: mode === 'simulate'
+      ? '（工具额度已用尽，请立刻按五段写完：【他确实说过】【现在的事实】【我怎么量它】【所以】【我可能错在哪】，一段都不能少，数字只用手上已有的）'
+      : '（工具额度已用尽，请立刻基于你手上的原文作答，并附上引用标记）' });
+    const acc = await streamChat({ model: model, messages: history, stream: true, max_tokens: MAXTOK, temperature: 0.3 }, apiKey, onDelta);
     spans.push({ i: spans.length, type: 'llm', round: rounds, forced: true, ms: acc.ms, ttft: acc.ttft,
       finish: acc.finish, prompt_tokens: (acc.usage || {}).prompt_tokens || 0,
       completion_tokens: (acc.usage || {}).completion_tokens || 0,
