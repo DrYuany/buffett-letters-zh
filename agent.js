@@ -29,7 +29,11 @@ const DEPLOY = !!process.env.PORT;
    这样访客才能享受免费额度。 */
 const KEY_FILES = [path.join(ROOT, '_agent.key'), path.join(os.homedir(), '.buffett-agent.key')];
 const KEY_FILE = KEY_FILES[0];
-const MEM_FILE = path.join(ROOT, 'agent-memory.json');
+/* 长期记忆默认写项目根的 agent-memory.json。
+   评测时用 AGENT_MEMORY_FILE 指向临时文件，既能测"记住/回忆"，又不会污染真读者的笔记。 */
+const MEM_FILE = process.env.AGENT_MEMORY_FILE
+  ? path.resolve(process.env.AGENT_MEMORY_FILE)
+  : path.join(ROOT, 'agent-memory.json');
 /* 免费额度：每位访客用站长的密钥免费问 10 次，用完再填自己的密钥。
    配额记在服务端 agent-quota.json 里（不进 git），清浏览器存储也刷不掉。
    另设一道全站每日上限：万一有人写脚本批量领额度，最多烧掉 FREE_DAY_MAX 问，
@@ -1410,11 +1414,25 @@ async function runAgent(ctx) {
     }
   }
   /* 工具这一路上翻过很多材料，但只有答案里真正挂了引用标记的才算"本次引用"。
-     按 marking 反查，来源清单才不会比答案本身长。 */
-  const used = allSources.filter(x => {
+     按标记反查，来源清单才不会比答案本身长。
+     注意：有些工具（concept_profile / stance_timeline）把原文写在正文里，
+     sources 只挑了少数几段；模型引用同批材料里的另一段时，只按工具自报的 sources
+     反查会漏掉 —— 答案有引用、来源清单却是空的，判分器就把真原文判成编造
+     （real-009 的 6 处引号全被判"疑似编造"就是这么来的）。
+     所以这里把答案里出现的、能在语料里落地的引用补进来源清单。 */
+  const usedMap = {};
+  const pushUsed = x => {
     const key = x.kind === 'letter' ? '[[' + x.l + '|' + x.b + ']]' : '[[web|' + x.url + ']]';
-    return text.indexOf(key) >= 0;
+    if (!usedMap[key]) usedMap[key] = x;
+  };
+  allSources.forEach(x => { if (text.indexOf(x.kind === 'letter' ? '[[' + x.l + '|' + x.b + ']]' : '[[web|' + x.url + ']]') >= 0) pushUsed(x); });
+  citeBag(text).forEach(c => {
+    if (c.k === 'web' && c.url) pushUsed({ kind: 'web', url: c.url, title: '' });
+    else if (c.l && L[c.l] && L[c.l].blocks && L[c.l].blocks[c.b]) {
+      pushUsed({ kind: 'letter', l: c.l, b: c.b, y: L[c.l].year });
+    }
   });
+  const used = Object.keys(usedMap).map(k => usedMap[k]);
   emit('sources', { sources: used, cites: citeBag(text) });
   if (final.truncated) emit('note', { text: '这次回答撞到了长度上限，可能没说完 —— 可以让它接着问，或换个更窄的问题。' });
 
