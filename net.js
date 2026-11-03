@@ -124,7 +124,16 @@ async function fetchText(url, opt = {}) {
 async function fetchJSON(url, opt = {}) {
   const r = await fetchText(url, opt);
   if (r.status < 200 || r.status >= 300) throw new Error('HTTP ' + r.status);
-  return JSON.parse(r.text);
+  const t = String(r.text || '').trim();
+  try { return JSON.parse(t); } catch (e) {
+    /* 东财有接口会按出口 IP 换格式：同一个 URL，本机拿回纯 JSON，
+       云端出口拿回 JSONP（jQuery3510_1699…({...})）。线上就是这么挂的——
+       「查代码失败：Unexpected token 'j'」。剥掉回调外壳再解一次，
+       剥不出来就抛原来的错，不影响真正返回 HTML 的情况。 */
+    const m = /^[\w$.]+\s*\(\s*([\s\S]*?)\s*\)\s*;?\s*$/.exec(t);
+    if (m) { try { return JSON.parse(m[1]); } catch (e2) { /* 落到下面抛原错 */ } }
+    throw e;
+  }
 }
 
 module.exports = { request, fetchText, fetchJSON, proxyOf, UA };
