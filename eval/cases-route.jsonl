@@ -1,0 +1,30 @@
+{"id":"route-001","layer":"route","q":"茅台现在这个价位，你会买吗？","gold":"judgment","note":"今天+决策，最典型的研判"}
+{"id":"route-002","layer":"route","q":"比亚迪现在这个估值，你买不买？","gold":"judgment","note":"个股研判"}
+{"id":"route-003","layer":"route","q":"银行股股息率这么高，是不是比存银行划算？","gold":"judgment","note":"比较型决策，triageMode 的 askDecide 靠它兜底"}
+{"id":"route-004","layer":"route","q":"沪深300 现在这个位置算贵还是便宜？","gold":"judgment","note":"指数估值研判"}
+{"id":"route-005","layer":"route","q":"宁德时代三季报出来后，这个价格你怎么看？","gold":"judgment","note":"「你怎么看」+实时"}
+{"id":"route-006","layer":"route","q":"白酒板块最近涨了不少，现在还能追吗？","gold":"judgment","note":"决策词「还能追」"}
+{"id":"route-007","layer":"route","q":"腾讯控股现在这个价位，你会买吗？","gold":"judgment","note":"港股研判，测新数据源路由"}
+{"id":"route-008","layer":"route","q":"特斯拉现在这个估值，你会买吗？","gold":"judgment","note":"美股研判，测新数据源路由"}
+{"id":"route-009","layer":"route","q":"给我一个能买的股票代码","gold":"judgment","note":"荐股。judgment 桶内会被 BOUNDS 拒答，不该落 chat"}
+{"id":"route-010","layer":"route","q":"他对回购股票的态度这些年变了吗？","gold":"quote","note":"问过去，翻原话"}
+{"id":"route-011","layer":"route","q":"「在别人贪婪时恐惧」这句话出自他哪封信？","gold":"quote","note":"查出处，不是查数"}
+{"id":"route-012","layer":"route","q":"1974 年和 2008 年他抄底时，说法有什么不同？","gold":"quote","note":"历史对比"}
+{"id":"route-013","layer":"route","q":"他是不是说过永远不要卖出好公司？","gold":"quote","note":"拿原文核对流传说法"}
+{"id":"route-014","layer":"route","q":"什么是保险浮存金？","gold":"quote","note":"概念解释，倾向翻他的原话；边界题，别误判成 lookup"}
+{"id":"route-015","layer":"route","q":"他最糟糕的一笔投资是哪个？","gold":"quote","note":"认错档案"}
+{"id":"route-016","layer":"route","q":"格雷厄姆和费雪对他的影响分别是什么？","gold":"quote","note":"问过去"}
+{"id":"route-017","layer":"route","q":"1969 年他为什么关闭合伙企业？","gold":"quote","note":"落到那年信里的原话"}
+{"id":"route-018","layer":"route","q":"芒格对他影响最大的是哪一点？","gold":"quote","note":"问过去"}
+{"id":"route-019","layer":"route","q":"他怎么定义一门好生意？","gold":"quote","note":"要他的原话式定义"}
+{"id":"route-020","layer":"route","q":"他提到过几次「护城河」？","gold":"lookup","note":"查次数。rubric 明确「出现几次」是 lookup，易误判成 quote"}
+{"id":"route-021","layer":"route","q":"贵州茅台现在的市盈率是多少？","gold":"lookup","note":"查一个数"}
+{"id":"route-022","layer":"route","q":"腾讯控股现在的市值是多少？","gold":"lookup","note":"港股查数，测新数据源"}
+{"id":"route-023","layer":"route","q":"苹果公司现在的市值是多少？","gold":"lookup","note":"美股查数，测新数据源"}
+{"id":"route-024","layer":"route","q":"伯克希尔现在的现金储备是多少？","gold":"lookup","note":"实时数字，需联网"}
+{"id":"route-025","layer":"route","q":"巴菲特是哪一年出生的？","gold":"lookup","note":"一句事实"}
+{"id":"route-026","layer":"route","q":"伯克希尔是哪一年成立的？","gold":"lookup","note":"一句事实"}
+{"id":"route-027","layer":"route","q":"茅台为什么叫茅台？","gold":"chat","note":"与投资无关的常识，别硬拉回投资"}
+{"id":"route-028","layer":"route","q":"今天天气怎么样？","gold":"chat","note":"纯闲聊"}
+{"id":"route-029","layer":"route","q":"你是谁？","gold":"chat","note":"身份闲聊"}
+{"id":"route-030","layer":"route","q":"吃了吗？","gold":"chat","note":"寒暄"}
