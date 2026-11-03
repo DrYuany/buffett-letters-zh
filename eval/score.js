@@ -309,13 +309,16 @@ function scoreLoopBudget(trace) {
 function scoreRetrieve() {
   const { searchDocs, L } = loadSearch();
   const cases = loadCases('cases-gold.jsonl');
+  /* 只对「字面检索」用例算 hit@6。认错/概念这类该走 corrections/concept_profile 工具的
+     用例，字面硬搜是错判（query 是主题标签，原文没这词），单列出来不打字面分。 */
+  const isLiteral = c => !(c.expect_tools || []).some(t => t === 'corrections' || t === 'concept_profile');
   const run = set => {
     let hit = 0, yc = 0, yg = 0;
     for (const c of set) {
       const o = { k: 6 };
       if (c.year_from) o.y0 = c.year_from;
       if (c.year_to) o.y1 = c.year_to;
-      const got = searchDocs(c.q, o).map(d => d.l + '|' + d.b);
+      const got = searchDocs(c.search_term || c.q, o).map(d => d.l + '|' + d.b);
       const gold = new Set(c.gold.map(g => g[0] + '|' + g[1]));
       if (got.some(x => gold.has(x))) hit++;
       const gy = new Set(c.gold.map(g => L[g[0]].year));
@@ -325,10 +328,14 @@ function scoreRetrieve() {
     return { n: set.length, hit6: set.length ? +(hit / set.length).toFixed(3) : null,
       year_cov: yg ? +(yc / yg).toFixed(3) : null };
   };
-  const all = run(cases);
-  const lx = run(cases.filter(c => !c.needs_alias));
-  const na = run(cases.filter(c => c.needs_alias));
-  return { all: all, lexical: lx, needs_alias: na };
+  const literal = cases.filter(isLiteral);
+  const routed = cases.filter(c => !isLiteral(c));
+  return {
+    all: run(literal),
+    lexical: run(literal.filter(c => !c.needs_alias)),
+    needs_alias: run(literal.filter(c => c.needs_alias)),
+    routed: { n: routed.length }
+  };
 }
 
 /* ---------------- B 层：模型判分 ---------------- */
@@ -437,9 +444,10 @@ async function judgeOne(c, trace, apiKey) {
   if (MODE === 'all' || MODE === 'retrieve') {
     out.retrieve = scoreRetrieve();
     const r = out.retrieve;
-    console.log('金标检索体检：全部 hit@6 ' + (r.all.hit6 * 100).toFixed(1) + '% · ' +
+    console.log('金标检索体检（字面检索 ' + r.all.n + ' 条）hit@6 ' + (r.all.hit6 * 100).toFixed(1) + '% · ' +
       '词面可检索 ' + r.lexical.n + ' 条 ' + (r.lexical.hit6 * 100).toFixed(1) + '% · ' +
-      '需别名/档案 ' + r.needs_alias.n + ' 条 ' + (r.needs_alias.hit6 * 100).toFixed(1) + '%');
+      '需别名/档案 ' + r.needs_alias.n + ' 条 ' + (r.needs_alias.hit6 * 100).toFixed(1) + '% · ' +
+      '工具路由 ' + r.routed.n + ' 条（corrections/concept_profile，不走字面打分）');
   }
   if (MODE === 'retrieve') {
     await fsp.mkdir(RES_DIR, { recursive: true });

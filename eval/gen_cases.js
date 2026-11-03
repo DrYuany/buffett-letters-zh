@@ -57,7 +57,9 @@ Object.keys(CT.companies).sort().forEach(name => {
 Object.keys(CT.concepts).sort().forEach(name => {
   const qs = (CT.concepts[name].quotes || []).filter(q => q.loc);
   if (qs.length < 2) return;
-  addCase(name, 'concept', qs.map(q => [q.loc.l, q.loc.b]), { expect_tools: ['search_letters'] });
+  /* 概念是人工主题标签（「科技与互联网」原文没这词），该走 concept_profile 档案，
+     不该拿字面检索硬搜。所以 expect_tools 标 concept_profile，不进字面 hit@6。 */
+  addCase(name, 'concept', qs.map(q => [q.loc.l, q.loc.b]), { expect_tools: ['concept_profile'] });
 });
 
 /* 4. 认错档案：这类题的期望路径是调 corrections 而不是硬检索。
@@ -87,7 +89,7 @@ const SPANS = [[1956, 1969, '合伙人时期'], [1970, 1989, '七八十年代'],
     const gold = ms.filter(m => m[0] >= sp[0] && m[0] <= sp[1]).map(m => [m[2], m[1]]);
     if (gold.length < 2) return;
     addCase(`${sp[2]}（${sp[0]}-${sp[1]}）他怎么讲${name}？`, 'span',
-      gold, { year_from: sp[0], year_to: sp[1] });
+      gold, { year_from: sp[0], year_to: sp[1], search_term: name });
   });
 });
 
@@ -116,6 +118,7 @@ const cases = Object.keys(byQ).sort().map(q => byQ[q])
       gold_years: Object.keys(years).map(Number).sort(),
       gold: c.gold,
       expect_tools: c.expect_tools.length ? c.expect_tools : ['search_letters'],
+      search_term: c.search_term || '',
       year_from: c.year_from, year_to: c.year_to,
       src: c.src
     };
