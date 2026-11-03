@@ -67,6 +67,48 @@ AUTO_ENTS = [
     {'kind': 'people', 'name': '菲利普·费雪', 'en': 'Philip Fisher', 'summary': '《怎样选择成长股》作者，影响巴菲特后期投资哲学。自动补录，无人工档案。'},
     {'kind': 'people', 'name': '彼得·林奇', 'en': 'Peter Lynch', 'summary': '麦哲伦基金经理，1988/1993 年信中提及。自动补录，无人工档案。'},
     {'kind': 'people', 'name': '沃尔特·施洛斯', 'en': 'Walter Schloss', 'summary': '格雷厄姆系价值投资者，2006 年信中提及。自动补录，无人工档案。'},
+    # 会议/演讲里新发现的实体（2026-11 实体发现：只出现在会议/演讲、信件名单里没有）
+    {'kind': 'companies', 'name': '好市多', 'en': 'Costco', 'summary': '仓储式零售巨头，股东会上多次作为好生意范例被讨论。'},
+    {'kind': 'companies', 'name': '前进保险', 'en': 'Progressive', 'summary': '美国汽车保险公司，股东会上讨论保险业时提及。'},
+    {'kind': 'companies', 'name': '美国国际集团', 'en': 'AIG', 'summary': '保险集团，金融危机期间被反复提及。'},
+    {'kind': 'companies', 'name': '联合服务汽车协会', 'en': 'USAA', 'summary': '面向军人的保险与金融服务协会，盖可创始人早年任职之处。'},
+    {'kind': 'companies', 'name': '太平洋电力公司', 'en': 'PacifiCorp', 'summary': '西部公用事业，2006 年伯克希尔收购，后并入 BHE。'},
+    {'kind': 'companies', 'name': '领航旅行中心', 'en': 'Pilot', 'summary': '卡车服务站与加油站运营商，伯克希尔近年增持至控股。'},
+    {'kind': 'companies', 'name': '长期资本管理公司', 'en': 'LTCM', 'summary': '1998 年崩溃的对冲基金，常被用作杠杆风险的教训。'},
+    {'kind': 'companies', 'name': '全美航空', 'en': 'USAir', 'summary': '美国航空公司，伯克希尔 1989 年买入其优先股。'},
+    {'kind': 'companies', 'name': '好事达保险', 'en': 'Allstate', 'summary': '美国保险公司，股东会上与盖可对比时提及。'},
+    {'kind': 'companies', 'name': '福特汽车', 'en': 'Ford', 'summary': '汽车制造商，讨论汽车业时提及。'},
+    {'kind': 'companies', 'name': '波音公司', 'en': 'Boeing', 'summary': '飞机制造商，讨论制造业时提及。'},
+    {'kind': 'companies', 'name': '花旗集团', 'en': 'Citigroup', 'summary': '银行，讨论银行业时提及。'},
+    {'kind': 'companies', 'name': '美孚石油', 'en': 'Mobil', 'summary': '石油公司，埃克森美孚前身之一。'},
+    {'kind': 'companies', 'name': '洛克伍德巧克力公司', 'en': 'Rockwood Chocolate', 'summary': '巧克力公司，合伙人时期持有。'},
+    {'kind': 'companies', 'name': '堪萨斯城南方铁路', 'en': 'Kansas City Southern', 'summary': '铁路公司，讨论铁路并购时提及。'},
+    {'kind': 'companies', 'name': '基威特公司', 'en': 'Kiewit', 'summary': '工程与建筑公司，巴菲特本人长期个人股东。'},
+    {'kind': 'companies', 'name': '苏黎世保险', 'en': 'Zurich', 'summary': '瑞士保险公司，2025 年与伯克希尔达成巨额保单合作。'},
+    {'kind': 'companies', 'name': '安达保险', 'en': 'Chubb', 'summary': '保险公司，2025 年与伯克希尔达成巨额保单合作。'},
+    {'kind': 'companies', 'name': '伊利诺伊国民银行', 'en': 'Illinois National Bank', 'summary': '银行，国民保险公司收购案的相关背景。'},
+    {'kind': 'companies', 'name': '范图尔集团', 'en': 'Van Tuyl', 'summary': '汽车经销商集团，2015 年伯克希尔收购。'},
+    {'kind': 'companies', 'name': 'Finova', 'en': 'Finova', 'summary': '金融服务公司，伯克希尔 2001 年投资。'},
+    {'kind': 'companies', 'name': 'MiTek', 'en': 'MiTek', 'summary': '建筑产品公司，伯克希尔子公司。'},
+    {'kind': 'companies', 'name': 'H.H. Brown', 'en': 'H.H. Brown', 'summary': '鞋业公司，伯克希尔子公司。'},
+    {'kind': 'companies', 'name': 'CTB', 'en': 'CTB', 'summary': '农业设备公司，伯克希尔子公司。'},
+    {'kind': 'companies', 'name': 'Leucadia', 'en': 'Leucadia', 'summary': '金融控股公司，与伯克希尔合资 Berkadia。'},
+    {'kind': 'companies', 'name': 'Berkadia', 'en': 'Berkadia', 'summary': '商业地产金融服务，伯克希尔与 Leucadia 合资。'},
+    {'kind': 'companies', 'name': '蒂芙尼', 'en': 'Tiffany', 'summary': '珠宝公司，讨论品牌时提及。'},
+    {'kind': 'companies', 'name': 'AOL', 'en': 'AOL', 'summary': '互联网服务商，讨论科技股时提及。'},
+    {'kind': 'companies', 'name': 'Uber', 'en': 'Uber', 'summary': '出行平台，讨论科技公司时提及。'},
+    {'kind': 'companies', 'name': 'LVMH', 'en': 'LVMH', 'summary': '奢侈品集团，讨论品牌护城河时提及。'},
+    {'kind': 'companies', 'name': 'Vanguard', 'en': 'Vanguard', 'summary': '资产管理公司，讨论指数基金时提及。'},
+    {'kind': 'companies', 'name': 'Teledyne', 'en': 'Teledyne', 'summary': '工业集团，讨论资本配置时提及。'},
+    {'kind': 'companies', 'name': 'Unocal', 'en': 'Unocal', 'summary': '石油公司，后被雪佛龙收购。'},
+    {'kind': 'companies', 'name': 'USG', 'en': 'USG', 'summary': '建筑材料公司，伯克希尔曾持有。'},
+    {'kind': 'companies', 'name': 'Equitas', 'en': 'Equitas', 'summary': '保险实体，承继劳合社历史负债。'},
+    {'kind': 'companies', 'name': 'Visa', 'en': 'Visa', 'summary': '支付网络，讨论支付与品牌时提及。'},
+    {'kind': 'companies', 'name': '迪士尼', 'en': 'Disney', 'summary': '传媒娱乐公司，讨论媒体与内容时提及。'},
+    {'kind': 'companies', 'name': '派拉蒙环球', 'en': 'Paramount', 'summary': '传媒公司，伯克希尔曾持有。'},
+    {'kind': 'companies', 'name': '谷歌', 'en': 'Google', 'summary': '科技公司，讨论科技股时提及。'},
+    {'kind': 'companies', 'name': '脸书', 'en': 'Facebook', 'summary': '科技公司，讨论科技股时提及。'},
+    {'kind': 'companies', 'name': '阿勒格尼公司', 'en': 'Alleghany', 'summary': '保险控股公司，2022 年伯克希尔以约 110 亿美元收购。'},
 ]
 companies += [dict(e, auto=True) for e in AUTO_ENTS if e['kind'] == 'companies']
 concepts  += [dict(e, auto=True) for e in AUTO_ENTS if e['kind'] == 'concepts']
@@ -74,7 +116,7 @@ people    += [dict(e, auto=True) for e in AUTO_ENTS if e['kind'] == 'people']
 
 # 高价值别名(仅手工补最关键的,其余靠字面匹配)
 ALIAS = {
-    '盖可保险': ['GEICO', '盖可'], '可口可乐': ['Coca-Cola'], '喜诗糖果': ["See's", "See’s"],
+    '盖可保险': ['GEICO', '盖可'], '可口可乐': ['Coca-Cola'], '喜诗糖果': ["See's", "See’s", "See's Candy", "See's Candies"],
     '伯克希尔哈撒韦': ['Berkshire', '伯克希尔'], '美国运通': ['American Express', '运通'],
     '中国石油': ['PetroChina'], '苹果': ['Apple'], 'BNSF铁路': ['BNSF', '伯灵顿', 'Burlington'],
     '富国银行': ['Wells Fargo'], '通用再保险': ['Gen Re'], '德克斯特鞋业': ['Dexter'],
@@ -82,9 +124,9 @@ ALIAS = {
     '芒格': ['Munger', '查理'], '格雷厄姆': ['Graham'], '阿吉特·贾恩': ['Ajit', '贾恩'],
     'B夫人': ['Mrs. B', 'Mrs B'], '格雷格·阿贝尔': ['Greg Abel', '阿贝尔'],
     '托德·库姆斯': ['Todd Combs', '库姆斯', '托德'], '泰德·韦施勒': ['Ted Weschler', '韦施勒', '泰德'],
-    '内布拉斯加家具店': ['NFM'], '大都会通信': ['Capital Cities'],
+    '内布拉斯加家具店': ['NFM'], '大都会通信': ['Capital Cities', 'Cap Cities', 'ABC'],
     '蓝筹印花': ['Blue Chip'], '所罗门': ['Salomon'], '穆迪': ["Moody's"],
-    '比亚迪': ['BYD'], '利捷航空': ['NetJets'], '冰雪皇后': ['Dairy Queen'],
+    '比亚迪': ['BYD'], '利捷航空': ['NetJets', 'Executive Jet'], '冰雪皇后': ['Dairy Queen'],
     '通用电气': ['GE', 'General Electric'], '雪佛龙': ['Chevron'],
     # 合并/改名的实体与同概念变体(独立核实后补):
     '卡夫亨氏': ['卡夫', '亨氏', 'Kraft', 'Heinz'],          # 2015 合并前分称卡夫/亨氏
@@ -98,6 +140,8 @@ ALIAS = {
     '凯瑟琳·格雷厄姆': ['凯瑟琳'], '比尔·盖茨': ['盖茨'],
     '苏茜·巴菲特': ['苏茜'], '卢·辛普森': ['辛普森'],
     '菲利普·费雪': ['费雪'], '彼得·林奇': ['林奇'], '沃尔特·施洛斯': ['施洛斯'],
+    # 会议/演讲实体发现时暴露的别名缺口（同一实体在不同语料里的叫法）:
+    '马蒙集团': ['美联集团', 'Marmon'], '国民保险公司': ['国民赔偿公司', 'National Indemnity'],
 }
 
 def surfaces(e):
