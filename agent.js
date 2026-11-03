@@ -1923,7 +1923,7 @@ chat —— 与投资、与信件无关的常识或闲聊，以及起名/来历�
     body: JSON.stringify({
       model: 'deepseek-flash',
       messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }],
-      temperature: 0, max_tokens: 12, stream: false,
+      temperature: 0, max_tokens: 512, stream: false,   /* flash 是推理模型，12 会被思考吃光、返回空内容 */
     }),
   });
   if (!r.ok) throw new Error('分类服务返回 ' + r.status);
