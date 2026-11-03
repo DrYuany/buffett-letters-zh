@@ -49,7 +49,7 @@
 
 ### 4. 认错档案
 
-108 条他公开承认过的错误与教训，按年份和严重程度整理——这部分比成功经验更有信息量。
+224 条他公开承认过的错误与教训（108 信件 + 105 股东大会 + 11 演讲），按年份和严重程度整理——这部分比成功经验更有信息量。
 
 ![认错档案](docs/screenshots/09-corrections.png)
 
@@ -245,7 +245,7 @@ node _agentcli.js "回购股票在他看来什么时候是对的？"
 ├── site/                 纯前端站点，打开 index.html 就能用
 │   ├── index.html        全部页面、样式与交互（单文件，约 147 KB）
 │   ├── data-core.js      信件元数据 + 实体归属表 + 别名表
-│   ├── data-content.js   概念档案 / 公司轨迹 / 108 条认错记录
+│   ├── data-content.js   概念档案 / 公司轨迹 / 224 条认错记录
 │   └── data-letters.js   信件全文（3.7 MB）
 ├── agent.js              本机 Agent 服务：静态托管 + SSE + 工具循环 + 记忆（零依赖）
 ├── extract_cases.js      从现有档案生成决策案例库 site/data-cases.js（分身用）
