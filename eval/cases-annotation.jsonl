@@ -1,0 +1,3 @@
+{"id":"ann-001","question":"他怎么看商誉？","corpus":"letter","gold":[{"loc":"1983 巴菲特致股东信 第40段","probe":"经济商誉"}]}
+{"id":"ann-002","question":"商誉怎么摊销？","corpus":"meeting","gold":[{"loc":"1999 股东大会 上午场 第24章「商誉成本应该留在账上」","probe":"我不认为它应该被摊销"}]}
+{"id":"ann-003","question":"怎么看科技股？","corpus":"speech","gold":[{"loc":"2020 沃伦·巴菲特接受CNBC专访","probe":"南瓜和老鼠终要显形"}]}
