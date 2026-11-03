@@ -13,7 +13,7 @@
  *     node eval/check_sim.js <file> --verbose             逐条打全表（默认只打不合格项）
  *
  * 判据不是我定的，是 systemPrompt 里那五段的契约。改提示词就得改这里，两处必须对得上：
- *   【他确实说过】原话逐字 + 能点回出处；【现在的事实】每条带数字或报告期；
+ *   【他确实说过】原话逐字 + 能点回出处；【现在的事实】每条带数字或报告期 + 来源标记；
  *   【我怎么量它】每个角度都有尺子 + 读数；【所以】一个明确立场；
  *   【我可能错在哪】一个能被人当面反驳的证伪点。
  *
@@ -309,6 +309,9 @@ function judgeOne(d) {
     facts.length + ' 条' + (admit.length ? '，另有 ' + admit.length + ' 条明说没拿到' : ''));
   rec('事实区', '每条都带数字或日期', badFact.length === 0,
     badFact.length ? badFact.length + ' 条没有数字：' + badFact[0].slice(0, 26) : '全部带数');
+  const noSrc = facts.filter(f => !/\[\[(?:quote|news|web)\|[^\]]+\]\]/.test(f));
+  rec('事实区', '每条都带来源标记', noSrc.length === 0,
+    noSrc.length ? noSrc.length + ' 条没标来源：' + noSrc[0].slice(0, 26) : '都标了');
 
   /* --- 量它区 --- */
   const angles = blocks(sec["我怎么量它"] || "");

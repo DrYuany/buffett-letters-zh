@@ -738,6 +738,26 @@ function hostBlocked(host) {
   return /^(127\.|localhost|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/i.test(host);
 }
 
+/* 行情/财报的落点页：把 market.js 返回的 secid 转成东财行情页。
+   A 股 1.600519 → sh600519；0.000001 → sz000001；指数 idx:SH000300 → zs000300。
+   转不出来就回一个东财首页，绝不拼错链接给读者 404。 */
+function eastmoneyUrl(item) {
+  if (!item) return 'https://quote.eastmoney.com/';
+  const secid = String(item.secid || '');
+  const code = String(item.code || '');
+  const m = /^(\d)\.(.+)$/.exec(secid);
+  if (m) {
+    const pre = m[1] === '1' ? 'sh' : (m[1] === '0' ? 'sz' : m[1]);
+    return 'https://quote.eastmoney.com/' + pre + m[2] + '.html';
+  }
+  if (secid.indexOf('idx:') === 0) {
+    const k = secid.slice(4).replace(/^(SH|SZ)/, '');
+    return 'https://quote.eastmoney.com/zs' + k + '.html';
+  }
+  if (code) return 'https://quote.eastmoney.com/' + code + '.html';
+  return 'https://quote.eastmoney.com/';
+}
+
 async function toolCall(name, args, asOf) {
   /* 时间闸门：回测时 asOf=1998，1998 年以后的材料一律不给他看。
      这是回测能不能算数的前提 —— 让他"看见"2016 年买苹果，再问他 1998 年怎么判断，
@@ -1041,7 +1061,11 @@ async function toolCall(name, args, asOf) {
       const tail = r.kind === 'index'
         ? '\n（来源：蛋卷指数估值，分位是过去十年的位置。数字照抄，不要自己换算或推算。）'
         : '\n（来源：东方财富行情与定期报告。A 股财报是年初至今的累计口径。数字照抄，不要自己换算或推算。）';
-      return { text: r.text + tail };
+      /* 行情/财报的落点页：股票指东财行情页，指数指蛋卷估值中心。模型照抄引用标记即可。 */
+      const src = r.kind === 'index'
+        ? { kind: 'quote', url: 'https://danjuanapp.com/djmodule/value-center', title: '蛋卷指数估值' }
+        : { kind: 'quote', url: eastmoneyUrl(r.item), title: '东方财富 · ' + ((r.quote && r.quote.name) || (r.item && r.item.name) || q) };
+      return { text: r.text + tail + '\n\n引用标记：[[quote|' + src.url + ']]', sources: [src] };
     }
     case 'market_news': {
       if (YMAX < 9999) return { text: '回测模式下不能看新闻：那是今天以后的报道。' };
@@ -1054,11 +1078,13 @@ async function toolCall(name, args, asOf) {
       catch (e) { return { text: '资讯接口没通：' + e.message + '。可以改用 web_search。' }; }
       if (!list.length) return { text: `没搜到「${kw}」相关的资讯。换个说法，或者只用财报数据回答。` };
       const body = list.map((x, i) =>
-        `[${i + 1}] ${x.date}　${x.media}\n${x.title}\n${x.content}`).join('\n\n');
+        `[${i + 1}] ${x.date}　${x.media}\n${x.title}\n${x.content}` +
+        (x.url ? `\n引用标记：[[news|${x.url}]]` : '')).join('\n\n');
       return {
         text: `【财经资讯 · 网络来源，只能当背景，不是他的话】\n${body}\n\n` +
           `（新闻稿可能有噪音，也有写错的时候。引用要带媒体名和日期；别拿一条新闻稿当立论的核心证据，` +
-          `核心证据用财报数字。以上没有一条能进「他确实说过」那一区。）`
+          `核心证据用财报数字。以上没有一条能进「他确实说过」那一区。）`,
+        sources: list.filter(x => x.url).map(x => ({ kind: 'news', url: x.url, title: (x.media ? x.media + ' · ' : '') + x.title }))
       };
     }
     case 'peer_compare': {
@@ -1076,9 +1102,13 @@ async function toolCall(name, args, asOf) {
           `，PE ${q.pe !== null && q.pe > 0 ? q.pe.toFixed(1) + ' 倍' : '—'}` +
           `，PB ${q.pb !== null && q.pb > 0 ? q.pb.toFixed(2) + ' 倍' : '—'}`;
       });
+      const okRows = rows.filter(r => r.ok);
+      const marks = okRows.map(r => '[[quote|' + eastmoneyUrl(r.item) + ']]').join(' ');
       return {
         text: `同行对比（${rows[0] && rows[0].at ? rows[0].at : ''}，同一时点）：\n${lines.join('\n')}\n` +
-          '（只看估值高低不够，要结合增速和毛利率说，那些数用 market_snapshot 单个查。）'
+          '（只看估值高低不够，要结合增速和毛利率说，那些数用 market_snapshot 单个查。）' +
+          (marks ? '\n\n引用标记：' + marks : ''),
+        sources: okRows.map(r => ({ kind: 'quote', url: eastmoneyUrl(r.item), title: r.query || (r.quote && r.quote.name) }))
       };
     }
     case 'count_mentions': {
@@ -1163,14 +1193,16 @@ function systemPrompt(memNotes, mode, opts) {
 3. 想知道最近发生了什么（批价、库存、政策、事故、并购、业绩预告、管理层变动、监管处罚），用 market_news 搜公司名或行业名——中文财经资讯比通用搜索准。它和财报要分开说：财报是事实，资讯是别人写的。
 4. 想说「它比同行贵」，必须先 peer_compare，没有参照物就没有贵不贵。
 第一轮就把这几个并行发起。数据没拿到，就在正文里明说这个数没拿到，绝不用记忆里的数字顶上。
+market_snapshot / market_news / peer_compare 的返回里会带「引用标记：[[quote|网址]] / [[news|网址]]」，写【现在的事实】时要原样抄上，那是那条数字的出处。
 
 【五段，标题照抄，各占一行】
 【他确实说过】
 只放工具返回里逐字不改的原话，每句后跟 [[信|段]]。没有就写「这些信里没查到直接对应的原话」。这一区最多三句，不要拿它占篇幅。
 
 【现在的事实】
-3 到 6 条，每条一个数字或一件已发生的事，必须带日期或报告期。
-像这样写：2026 年三季报营收 1332.8 亿元、同比 +1.8%；净利 644.7 亿元、同比 -0.3%；毛利率 89.6%；当前 PE 20.9 倍，处在近五年价格的 45% 分位。
+3 到 6 条，每条一个数字或一件已发生的事，必须带日期或报告期，并且末尾跟上它的出处标记——照抄工具返回的「引用标记：[[quote|网址]] / [[news|网址]]」，一个字都不要改。
+像这样写：2026 年三季报营收 1332.8 亿元、同比 +1.8%；净利 644.7 亿元、同比 -0.3%；当前 PE 20.9 倍 [[quote|https://quote.eastmoney.com/sh600519.html]]。
+行情/财报用 [[quote|…]]，资讯（批价、政策、事故、公告）用 [[news|…]]，别混用。
 不许写「业绩承压」「估值处于低位」「行业景气度上行」这类没有数字的判断句——那是把结论当事实。
 
 【我怎么量它】
@@ -1201,6 +1233,7 @@ function systemPrompt(memNotes, mode, opts) {
 4. 读者问「明天涨不涨」「给我一个代码」「现在满仓行不行」，照样拒绝——那是预测和荐股。但问「这家公司怎么样」「现在值不值得买」，那是判断，必须给明确立场。他一辈子拒的是预测大盘和短期走势，从不拒绝对一家公司下判断。
 5. 工具返回里标了「概述，不可逐字引用」的文字，只能用来理解情形，不能当原话。
 6. 全文 1000-1400 字，宁可短。【我怎么量它】2 到 3 个角度，不要凑第四个；【现在的事实】3 到 5 条，不要凑第六条。写不下时先砍【他确实说过】的句数，再压事实条数——【所以】和【我可能错在哪】一段都不能少，被截断比写短更糟。
+7. 被问「这个数字/事实从哪里来、有来源吗」时，不要重答整件事：先指出上一轮答案里那条事实后面的 [[quote|…]] / [[news|…]] 标记，说清那是东财行情/财报还是哪家媒体的资讯；如果那条没标、或你记不准确切出处，就重新调对应工具核实，绝不凭印象编一个来源。
 ${voiceBlock(opts.noVoice)}
 ${BOUNDS}
 ${work}
@@ -1479,7 +1512,7 @@ async function runAgent(ctx) {
         n_sources: (res.sources || []).length,
         error: /^工具出错/.test(res.text || '') ? (res.text || '').slice(0, 120) : null });
       const sources = (res.sources || []).filter(x => {
-        const key = x.kind === 'letter' ? x.l + '|' + x.b : 'web|' + x.url;
+        const key = sourceKey(x);
         if (s.cited[key]) return false;
         s.cited[key] = 1;
         return true;
@@ -1530,12 +1563,12 @@ async function runAgent(ctx) {
      所以这里把答案里出现的、能在语料里落地的引用补进来源清单。 */
   const usedMap = {};
   const pushUsed = x => {
-    const key = x.kind === 'letter' ? '[[' + x.l + '|' + x.b + ']]' : '[[web|' + x.url + ']]';
+    const key = sourceMark(x);
     if (!usedMap[key]) usedMap[key] = x;
   };
-  allSources.forEach(x => { if (text.indexOf(x.kind === 'letter' ? '[[' + x.l + '|' + x.b + ']]' : '[[web|' + x.url + ']]') >= 0) pushUsed(x); });
+  allSources.forEach(x => { if (text.indexOf(sourceMark(x)) >= 0) pushUsed(x); });
   citeBag(text).forEach(c => {
-    if (c.k === 'web' && c.url) pushUsed({ kind: 'web', url: c.url, title: '' });
+    if ((c.k === 'web' || c.k === 'quote' || c.k === 'news') && c.url) pushUsed({ kind: c.k, url: c.url, title: '' });
     else if (c.l && L[c.l] && L[c.l].blocks && L[c.l].blocks[c.b]) {
       pushUsed({ kind: 'letter', l: c.l, b: c.b, y: L[c.l].year });
     }
@@ -1671,14 +1704,24 @@ function triageMode(message, mode) {
 }
 /* 答案里的引用标记 [[信|段]] / [[web|url]] —— 判「引用存不存在」就从这里下手。
    注意「信」那一截是信件 id（形如「2018 巴菲特致股东信」），不是数字下标。 */
-const CITE_RE = /\[\[([^|\]]+)\|(\d+)\]\]|\[\[web\|([^\]]+)\]\]/g;
+/* URL 型引用标记的类别：[[web|…]] 通用网页、[[quote|…]] 行情/财报、[[news|…]] 资讯。
+   三类都是「label|url」，只是胶囊长相不同；letter 仍是「label|数字段号」。 */
+const CITE_RE = /\[\[([^|\]]+)\|(\d+)\]\]|\[\[(web|quote|news)\|([^\]]+)\]\]/g;
 function parseCites(text) {
   const out = []; let m;
   CITE_RE.lastIndex = 0;
   while ((m = CITE_RE.exec(text))) {
-    out.push(m[3] !== undefined ? { kind: 'web', url: m[3] } : { kind: 'letter', l: m[1], b: +m[2] });
+    out.push(m[4] !== undefined ? { kind: m[3], url: m[4] } : { kind: 'letter', l: m[1], b: +m[2] });
   }
   return out;
+}
+/* 一条 source 的「标记原文」与「去重键」。letter 与 URL 型统一从这里产出，
+   免得 source 过滤、来源清单、citeBag 三处各写一套。 */
+function sourceMark(x) {
+  return x.kind === 'letter' ? '[[' + x.l + '|' + x.b + ']]' : '[[' + x.kind + '|' + x.url + ']]';
+}
+function sourceKey(x) {
+  return x.kind === 'letter' ? x.l + '|' + x.b : x.kind + '|' + x.url;
 }
 
 /* 引用胶囊的“长相”：类别、符号、名字都在这里定，前端只管照着画。
@@ -1690,12 +1733,16 @@ const CITE_KINDS = {
   speech:  { icon: '🎤', name: '演讲访谈', cls: 'speech' },
   memo:    { icon: '📝', name: '致辞短文', cls: 'memo' },
   web:     { icon: '🌐', name: '网络来源', cls: 'web' },
+  quote:   { icon: '📈', name: '行情/财报', cls: 'quote' },
+  news:    { icon: '📰', name: '资讯', cls: 'news' },
   case:    { icon: '🎬', name: '案例', cls: 'case' },
   other:   { icon: '🔖', name: '资料', cls: 'other' }
 };
 function citeKindOf(label) {
   const s = String(label || '');
   if (s === 'web') return 'web';
+  if (s === 'quote') return 'quote';
+  if (s === 'news') return 'news';
   if (s.indexOf('sc-') === 0 || s.indexOf('rule-') === 0 || s.indexOf('corr-') === 0) return 'case';
   if (/致合伙人信|合伙人信/.test(s)) return 'partner';
   if (/致股东信|致股东的信/.test(s)) return 'letter';
@@ -1709,25 +1756,26 @@ function citeMeta(label, ref) {
   const k = citeKindOf(label);
   const pack = CITE_KINDS[k] || CITE_KINDS.other;
   const s = String(label || '');
+  const isUrl = k === 'web' || k === 'quote' || k === 'news';
   return {
     k: k, icon: pack.icon, name: pack.name, cls: pack.cls,
     year: (s.match(/\d{4}/) || [''])[0] || '',
-    l: k === 'web' || k === 'case' ? '' : s,
-    b: k === 'web' || k === 'case' ? 0 : (+ref || 0),
-    url: k === 'web' ? String(ref || '') : ''
+    l: isUrl || k === 'case' ? '' : s,
+    b: isUrl || k === 'case' ? 0 : (+ref || 0),
+    url: isUrl ? String(ref || '') : ''
   };
 }
 /* 答案里出现过的引用标记（去重，保持出现顺序）。前端拿它把标记画成可点的符号。 */
 function citeBag(text) {
   const out = [], seen = {};
-  const re = /\[\[([^|\]]+)\|(\d+)\]\]|\[\[web\|([^\]]+)\]\]/g;
+  const re = /\[\[([^|\]]+)\|(\d+)\]\]|\[\[(web|quote|news)\|([^\]]+)\]\]/g;
   let m;
   while ((m = re.exec(String(text || '')))) {
     const key = m[0];
     if (seen[key]) continue;
     seen[key] = 1;
-    const label = m[3] !== undefined ? 'web' : m[1];
-    const ref = m[3] !== undefined ? m[3] : m[2];
+    const label = m[4] !== undefined ? m[3] : m[1];
+    const ref = m[4] !== undefined ? m[4] : m[2];
     out.push(Object.assign({ key: key }, citeMeta(label, ref)));
   }
   return out;

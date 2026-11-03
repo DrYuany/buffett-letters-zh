@@ -569,6 +569,10 @@ a.noyr{text-decoration:none;pointer-events:none}
 .ct-cite.ct-memo{background:#FDF3E3;border-color:#F0DCB4;color:#8A5A1A}
 .ct-cite.ct-memo:hover{box-shadow:0 4px 12px rgba(138,90,26,.16)}
 .ct-cite.ct-case{background:#EAF6F6;border-color:#CBE7E7;color:#206B6B}
+.ct-cite.ct-quote{background:#EDF0FB;border-color:#D2D9F2;color:#3A4A9E}
+.ct-cite.ct-quote:hover{box-shadow:0 4px 12px rgba(58,74,158,.16)}
+.ct-cite.ct-news{background:#FBEEF0;border-color:#F2D3D9;color:#9E3A4B}
+.ct-cite.ct-news:hover{box-shadow:0 4px 12px rgba(158,58,75,.16)}
 .ct-cite.ct-other{background:#F4F1EC;border-color:#E3DCD0;color:#6B6560}
 .tp-meta{margin-top:7px;font-size:11px;color:var(--ink3)}
 .tp-h{font-weight:700;color:var(--text);margin-top:12px}
@@ -2007,6 +2011,8 @@ function talkMsgs(){
    引文用 > 起头，加粗用 **。 */
 var CITE_LOOK = [
   [/^web$/, 'web', '🌐', '网页'],
+  [/^quote$/, 'quote', '📈', '行情/财报'],
+  [/^news$/, 'news', '📰', '资讯'],
   [/^(sc-|rule-|corr-)/, 'case', '🎬', '案例'],
   [/致合伙人信/, 'partner', '🤝', '合伙人信'],
   [/致股东信|致股东的信/, 'letter', '📜', '致股东信'],
@@ -2030,13 +2036,14 @@ function citeMap(list){
 function fmtCite(s, cmap){
   return s.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, function(all, a, b){
     var look = (cmap && cmap[all]) || citeLook(a);
-    if (a === 'web'){
+    if (a === 'web' || a === 'quote' || a === 'news'){
+      var look0 = citeLook(a);
       var url = b.replace(/&amp;/g, '&');
       var host = '';
       try { host = url.split('/')[2] || ''; } catch (e) {}
-      return '<a class="ct-cite ct-web" href="' + url + '" target="_blank" rel="noopener"' +
-        ' title="网页' + (host ? '：' + esc(host) : '') + '（点开在新标签页看）">' +
-        '<span class="cic">' + (look.icon || '🌐') + '</span><span class="cn">网页</span></a>';
+      return '<a class="ct-cite ct-' + look0.k + '" href="' + url + '" target="_blank" rel="noopener"' +
+        ' title="' + esc(look0.name) + (host ? '：' + esc(host) : '') + '（点开在新标签页看）">' +
+        '<span class="cic">' + look0.icon + '</span><span class="cn">' + esc(look0.name) + '</span></a>';
     }
     var y = (a.match(/\d{4}/) || [''])[0];
     var txt = y || look.name || '资料';
@@ -2139,10 +2146,14 @@ function fmtSrcs(list){
         return '<a href="#/l/' + encodeURIComponent(s.l) + '?b=' + s.b + '">' +
           '<span class="cic">' + look.icon + '</span><span class="tx">' + s.y + ' 年 · ' + esc(s.l) + ' 第 ' + s.b + ' 段</span></a>';
       }
+      var isQuote = s.kind === 'quote', isNews = s.kind === 'news';
+      var icon = isQuote ? '📈' : (isNews ? '📰' : '🌐');
+      var name = isQuote ? '行情/财报' : (isNews ? '资讯' : '网页');
       var host = '';
       try { host = s.url.split('/')[2] || ''; } catch (e) {}
       return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' +
-        '<span class="cic">🌐</span><span class="tx">网页 · ' + esc(host) + ' — ' + esc(String(s.title || '').slice(0, 46)) + '</span></a>';
+        '<span class="cic">' + icon + '</span><span class="tx">' + name + ' · ' + esc(host) +
+        (s.title ? ' — ' + esc(String(s.title).slice(0, 46)) : '') + '</span></a>';
     }).join('') + '</div>';
 }
 
