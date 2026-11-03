@@ -771,6 +771,21 @@ function ensureLetters(){
   });
   return _lettersPromise;
 }
+/* data-mentions.js 懒加载：只有进实体页才拉（会议/演讲出场约 1MB）。
+   缺失时静默降级——实体页只显示信件出场，不影响主体。 */
+var _mauxPromise = null, _mauxTried = false, MAUX = null;
+function ensureMentionsAux(){
+  if (MAUX || _mauxTried) return Promise.resolve();
+  if (_mauxPromise) return _mauxPromise;
+  _mauxPromise = new Promise(function(resolve){
+    var s = document.createElement('script');
+    s.src = 'data-mentions.js';
+    s.onload = function(){ MAUX = window.MENTIONS_AUX; _mauxTried = true; resolve(); };
+    s.onerror = function(){ _mauxTried = true; resolve(); };
+    document.head.appendChild(s);
+  });
+  return _mauxPromise;
+}
 /* 语料真实年份范围（第一封是 1956 有限合伙协议，不是 1957） */
 var CY0 = Math.min.apply(null, C.letters.map(function(l){ return l.year; }));
 var CY1 = Math.max.apply(null, C.letters.map(function(l){ return l.year; }));
@@ -1258,6 +1273,45 @@ function entity(kind, name){
     });
     h += '</div>';
   });
+
+  /* 会议出场（股东大会问答）：全文不在浏览器，snippet 已内联，纯展示、无跳转 */
+  var SESS_CN = { Morning_Session:'上午场', Afternoon_Session:'下午场', Part_1:'第一部分', Part_2_Q:'第二部分问答' };
+  if (MAUX && MAUX.meeting[name] && MAUX.meeting[name].length){
+    var mByYear = {};
+    MAUX.meeting[name].forEach(function(m){ (mByYear[m[0]] = mByYear[m[0]] || []).push(m); });
+    var mYears = Object.keys(mByYear).map(Number).sort(function(a,b){ return a-b; });
+    h += '<h2 class="h2">会议出场 · 股东大会（巴菲特/芒格本人发言）</h2>';
+    mYears.forEach(function(y){
+      var arr = mByYear[y];
+      h += '<div class="yrblk"><div class="yrhd"><b>' + y + '</b><span>' + arr.length + ' 段</span></div>';
+      arr.slice(0, 6).forEach(function(m){
+        var sess = SESS_CN[m[1]] || m[1];
+        var who = m[3] === 'buffett' ? '巴菲特' : '芒格';
+        var tx = m[4];
+        if (tx.length > 120) tx = tx.slice(0, 120) + '…';
+        h += '<div class="snip"><span class="go">' + y + ' · ' + sess + '（' + who + '） →</span>' + markIn(tx, name) + '</div>';
+      });
+      h += '</div>';
+    });
+  }
+  /* 演讲出场（公开演讲与访谈）：同会议，snippet 内联、纯展示 */
+  if (MAUX && MAUX.speech[name] && MAUX.speech[name].length){
+    var sByYear = {};
+    MAUX.speech[name].forEach(function(m){ (sByYear[m[0]] = sByYear[m[0]] || []).push(m); });
+    var sYears = Object.keys(sByYear).map(Number).sort(function(a,b){ return a-b; });
+    h += '<h2 class="h2">演讲出场 · 公开演讲与访谈</h2>';
+    sYears.forEach(function(y){
+      var arr = sByYear[y];
+      h += '<div class="yrblk"><div class="yrhd"><b>' + y + '</b><span>' + arr.length + ' 段</span></div>';
+      arr.slice(0, 6).forEach(function(m){
+        var who = m[3] === 'buffett' ? '巴菲特' : '芒格';
+        var tx = m[4];
+        if (tx.length > 120) tx = tx.slice(0, 120) + '…';
+        h += '<div class="snip"><span class="go">' + y + ' · ' + esc(m[1]) + '（' + who + '） →</span>' + markIn(tx, name) + '</div>';
+      });
+      h += '</div>';
+    });
+  }
   return h;
 }
 
@@ -2542,10 +2596,15 @@ function render(){
   /* 需要信件原文的路由：读信页(l)、实体出场页(e)、全文搜索(q)、对话页(talk)。
      LETTERS 懒加载——首屏不拉这 3.5MB，只有进这些页才动态加载。 */
   var NEEDS_L = {l:1, e:1, q:1, talk:1};
-  if (NEEDS_L[p[1]] && !L){
+  var needL = NEEDS_L[p[1]] && !L;
+  var needMaux = (p[1] === 'e') && !MAUX && !_mauxTried;
+  if (needL || needMaux){
     app.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--ink2);font-size:14px">'
-      + '<span class="boot-dot" style="margin-right:8px"></span>正在加载信件原文…</div>';
-    ensureLetters().then(function(){ render(); })
+      + '<span class="boot-dot" style="margin-right:8px"></span>正在加载…</div>';
+    var jobs = [];
+    if (needL) jobs.push(ensureLetters());
+    if (needMaux) jobs.push(ensureMentionsAux());
+    Promise.all(jobs).then(function(){ render(); })
       .catch(function(e){
         app.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--ink2)">'
           + '信件原文加载失败：' + esc(e.message) + '<br><a href="#/">回首页</a></div>';

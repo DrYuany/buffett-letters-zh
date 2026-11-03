@@ -54,9 +54,14 @@ function loadData() {
   for (const f of ['data-core.js', 'data-letters.js', 'data-content.js']) {
     vm.runInContext(fs.readFileSync(path.join(SITE, f), 'utf8'), ctx, { filename: f });
   }
-  return { C: win.CORE, L: win.LETTERS, CT: win.CONTENT };
+  let MAUX = null;
+  try {
+    vm.runInContext(fs.readFileSync(path.join(SITE, 'data-mentions.js'), 'utf8'), ctx, { filename: 'data-mentions.js' });
+    MAUX = win.MENTIONS_AUX || null;
+  } catch (e) { /* 没生成就不展示 */ }
+  return { C: win.CORE, L: win.LETTERS, CT: win.CONTENT, MAUX };
 }
-const { C, L, CT } = loadData();
+const { C, L, CT, MAUX } = loadData();
 
 /* 与 build.py 的 block_text() / 前端 index.html 的 blockText() 完全一致：
    表格块拼 head + rows，其余取 t */
@@ -905,7 +910,10 @@ async function toolCall(name, args, asOf) {
       if (!spec) return { text: `没有「${nm}」的概念档案。可用概念：${Object.keys(CT.concepts).slice(0, 40).join('、')}` };
       const ms = C.mentions[nm] || [];
       const years = ms.map(m => m[0]);
-      const head = `「${nm}」在语料里出现 ${ms.length + (C.overflow[nm] || 0)} 次` + (years.length ? `，跨 ${Math.min.apply(null, years)}-${Math.max.apply(null, years)} 年。` : '。');
+      let head = `「${nm}」在语料里出现 ${ms.length + (C.overflow[nm] || 0)} 次` + (years.length ? `，跨 ${Math.min.apply(null, years)}-${Math.max.apply(null, years)} 年。` : '。');
+      const mMeet = MAUX && MAUX.meeting[nm] ? MAUX.meeting[nm].length : 0;
+      const mSpeech = MAUX && MAUX.speech[nm] ? MAUX.speech[nm].length : 0;
+      if (MAUX && (mMeet || mSpeech)) head += `\n会议 ${mMeet} 段、演讲 ${mSpeech} 段提及（上面的次数仅信件口径）`;
       const periods = (spec.periods || []).map(p => `${p.y0}-${p.y1}（${p.name}）：${String(p.text).slice(0, 320)}`).join('\n\n');
       return { text: head + '\n\n人工档案把它分成 ' + (spec.periods || []).length + ' 段：\n\n' + periods, sources: [] };
     }
@@ -917,7 +925,10 @@ async function toolCall(name, args, asOf) {
       const tl = spec.timeline || [];
       const lines = tl.slice(0, 14).map(t => `${t.y} 年：${String(t.note).slice(0, 170)}  引用标记：[[${t.loc.l}|${t.loc.b}]]`);
       const picks = tl.filter(t => t.loc).slice(0, 14).map(t => ({ kind: 'letter', l: t.loc.l, b: t.loc.b, y: +t.y }));
-      return { text: `「${nm}」档案里有 ${tl.length} 条跨年记录：\n` + lines.join('\n') + (tl.length > 14 ? `\n（还有 ${tl.length - 14} 条）` : ''), sources: picks };
+      const mMeet = MAUX && MAUX.meeting[nm] ? MAUX.meeting[nm].length : 0;
+      const mSpeech = MAUX && MAUX.speech[nm] ? MAUX.speech[nm].length : 0;
+      const mauxNote = (MAUX && (mMeet || mSpeech)) ? `\n（另：会议 ${mMeet} 段、演讲 ${mSpeech} 段提及）` : '';
+      return { text: `「${nm}」档案里有 ${tl.length} 条跨年记录：\n` + lines.join('\n') + (tl.length > 14 ? `\n（还有 ${tl.length - 14} 条）` : '') + mauxNote, sources: picks };
     }
     case 'corrections': {
       const kw = String(args.topic || '').trim();
