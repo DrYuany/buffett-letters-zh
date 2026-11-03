@@ -33,9 +33,11 @@ async function httpJSON(url, ms = 9000) {
    - datacenter-web 和蛋卷是通的，所以财报、指数估值不受影响。
    腾讯和新浪在云端都正常。
 
-   分工：找代码用新浪 suggest3，取行情用腾讯 qt.gtimg.cn，价格分位用新浪日线。
-   腾讯的 PE(TTM)/PB/总市值和东财逐位对得上（茅台 22.18 / 6.72 / 18221.94 亿），
-   但它只有一个 PE 口径，另外两个留空——不许拿同一个数冒充三个口径。 */
+   分工：找代码走新浪 suggest3（A股），再退腾讯 smartbox（港股/美股）；取行情用腾讯 qt.gtimg.cn，
+   价格分位用腾讯月线（再退新浪日线）。
+   腾讯 A股的 PE 三个口径都给，和东财逐位对得上（茅台动态 21.52 / 静态 22.47 / TTM 22.52）；
+   港股美股只有 TTM 靠谱。前提是走 rawText（全局 fetch）拿到全格式——net.js 的 http 模块
+   会拿到错位一格的短格式。 */
 
 const GBK = (() => { try { return new TextDecoder('gbk'); } catch (e) { return null; } })();
 
@@ -57,6 +59,29 @@ function symOf(secid) {
   return m ? (m[1] === '1' ? 'sh' : 'sz') + m[2] : null;
 }
 
+/* 东财 secid → 腾讯行情符号：A股 sh/sz + 6 位，港股 hk + 5 位，美股 us + 代码。
+   只认 A股/港股/美股三类，其余（指数、债券、权证）返回 null，交给别的路径。 */
+function tencentSymOf(secid) {
+  const m = /^(\d+)\.(.+)$/.exec(String(secid || ''));
+  if (!m) return null;
+  const mk = m[1], code = m[2];
+  if (mk === '1') return 'sh' + code;
+  if (mk === '0') return 'sz' + code;
+  if (mk === '116' || mk === '128') return 'hk' + code;
+  if (mk === '105' || mk === '106' || mk === '107') return 'us' + code;
+  return null;
+}
+
+/* secid 前缀 → 市场：'A' / 'HK' / 'US' / null。腾讯行情三个市场的字段布局不同，靠它分流。 */
+function secidMarket(secid) {
+  const m = /^(\d+)\./.exec(String(secid || ''));
+  const mk = m && m[1];
+  if (mk === '1' || mk === '0') return 'A';
+  if (mk === '116' || mk === '128') return 'HK';
+  if (mk === '105' || mk === '106' || mk === '107') return 'US';
+  return null;
+}
+
 async function sinaSuggest(q) {
   const t = await rawText('https://suggest3.sinajs.cn/suggest/type=11,12,15&key=' + encodeURIComponent(q),
     { Referer: 'https://finance.sina.com.cn' });
@@ -74,8 +99,36 @@ async function sinaSuggest(q) {
   return out;
 }
 
+/* 腾讯代码联想：云端用（东财 searchapi 和 新浪 suggest3 都不覆盖港股/美股时兜底）。
+   返回格式和东财 suggest 对齐：{ code, name, secid, cls, market, mktNum }。
+   只留股票（type 以 GP 开头），滤掉 ETF/期权/权证/债/基金；美股代码带交易所后缀
+   （aapl.oq），剥掉取裸代码。名字字段是 \uXXXX 转义，要先解开。 */
+async function tencentSuggest(q) {
+  const t = await rawText('https://smartbox.gtimg.cn/s3/?v=2&q=' + encodeURIComponent(q) + '&t=all&c=1&d=1',
+    { Referer: 'https://gu.qq.com' });
+  const m = /v_hint="([^"]*)"/.exec(t);
+  if (!m || !m[1]) return [];
+  const uni = s => String(s || '').replace(/\\u([0-9a-fA-F]{4})/g, (x, h) => String.fromCharCode(parseInt(h, 16)));
+  const out = [];
+  for (const seg of m[1].split('^')) {
+    const f = seg.split('~');
+    if (f.length < 5) continue;
+    const mk = f[0], code = f[1], name = uni(f[2]), type = f[4] || '';
+    if (!/^GP/.test(type)) continue;                    /* 只要股票，不要指数/债/权证 */
+    if (/ETF|期权|涡轮|权证|票据|债券|基金/i.test(name)) continue;
+    if (mk === 'sh') out.push({ code, name, secid: '1.' + code, cls: 'AStock', market: '沪A', mktNum: '1' });
+    else if (mk === 'sz') out.push({ code, name, secid: '0.' + code, cls: 'AStock', market: '深A', mktNum: '0' });
+    else if (mk === 'hk') out.push({ code, name, secid: '116.' + code, cls: 'HK', market: '港股', mktNum: '116' });
+    else if (mk === 'us') {
+      const tk = String(code).split('.')[0].toUpperCase();
+      if (tk) out.push({ code: tk, name, secid: '105.' + tk, cls: 'UsStock', market: '美股', mktNum: '105' });
+    }
+  }
+  return out.slice(0, 8);
+}
+
 async function tencentQuotes(list) {
-  const pairs = list.map(it => [it, symOf(it.secid)]).filter(x => x[1]);
+  const pairs = list.map(it => [it, tencentSymOf(it.secid)]).filter(x => x[1]);
   if (!pairs.length) return list.map(it => ({ ...it, ok: false, err: '行情接口没有这只' }));
   const t = await rawText('https://qt.gtimg.cn/q=' + pairs.map(x => x[1]).join(','), { Referer: 'https://finance.qq.com' });
   const by = {};
@@ -89,6 +142,8 @@ async function tencentQuotes(list) {
   return list.map(it => {
     const f = by[it.code];
     if (!f) return { ...it, ok: false, err: '行情接口没有这只' };
+    const mkt = secidMarket(it.secid);
+    const isA = mkt === 'A';
     return {
       ...it, ok: true, src: 'tencent',
       name: f[1] || it.name,
@@ -96,9 +151,13 @@ async function tencentQuotes(list) {
       chgPct: n(f[32]),                       /* 腾讯这个字段已经是百分数，不除 100 */
       high: n(f[33]), low: n(f[34]),
       mcap: n(f[45]) === null ? null : Math.round(n(f[45]) * 1e8),   /* 腾讯给的是亿元 */
-      pe: null, peTTM: n(f[39]), peStatic: null,
-      pb: n(f[46]),
-      cur: 'CNY',
+      /* A股三个 PE 口径腾讯都给（2026-11-03 与东财逐位核对）：f39=TTM、f52=动态、f53=静态。
+         港股美股布局不同：f46 是英文名、f52/f53 不是 PE，只有 f39(TTM) 靠谱，其余留空。
+         注意：必须走 rawText（全局 fetch）才是全格式；net.js 的 http 模块会拿到
+         错位一格的短格式（f46 变成涨停价），所以这里不许换成 fetchText。 */
+      pe: isA ? n(f[52]) : null, peTTM: n(f[39]), peStatic: isA ? n(f[53]) : null,
+      pb: isA ? n(f[46]) : null,
+      cur: mkt === 'US' ? 'USD' : mkt === 'HK' ? 'HKD' : 'CNY',
     };
   });
 }
@@ -119,9 +178,39 @@ async function sinaBand(it, days = 1200, lastPx = null) {
   vals.forEach((v, i) => { if (v < vals[lo]) lo = i; if (v > vals[hi]) hi = i; });
   return {
     label: '约 ' + Math.round(row.length / 240) + ' 年日线', n: row.length,
-    last, pct: vals.filter(x => x <= last).length / vals.length,
+    src: 'sina', last,
+    pct: vals.filter(x => x <= last).length / vals.length,
     lo: vals[lo], loAt: row[lo].day.slice(0, 7),
     hi: vals[hi], hiAt: row[hi].day.slice(0, 7),
+  };
+}
+
+/* 腾讯月线：云端拿不到东财 push2his（月线）时，用它恢复同一个「近 N 个月月线」口径。
+   前复权（qfq）和东财 fqt=1 一致，最近一根月线的收盘价≈现价，能直接和现价比分位。
+   港股有月线，美股接口只回 1 根（不支持），返回 null 交给上层留空。
+   每条格式 [date, open, close, high, low, volume]，close 在下标 2。 */
+async function tencentBand(item, months = 60, lastPx = null) {
+  const sym = tencentSymOf(item.secid);
+  if (!sym) return null;
+  const t = await rawText('https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=' +
+    sym + ',month,,,' + months + ',qfq', { Referer: 'https://gu.qq.com' });
+  const j = JSON.parse(t);
+  const node = (j && j.data && j.data[sym]) || {};
+  const ks = node.qfqmonth || node.month || [];
+  const rows = ks.filter(x => Array.isArray(x) && x.length >= 5 && isFinite(+x[2]) && +x[2] > 0)
+    .map(x => ({ day: String(x[0]), close: +x[2] }));
+  if (rows.length < 12) return null;
+  const vals = rows.map(x => x.close);
+  /* 末根是当前（未走完）的月，收盘≈现价；给 lastPx 就用真实现价顶掉，口径和东财一致。 */
+  const last = (lastPx != null && isFinite(lastPx) && lastPx > 0) ? +lastPx : vals[vals.length - 1];
+  let lo = 0, hi = 0;
+  vals.forEach((v, i) => { if (v < vals[lo]) lo = i; if (v > vals[hi]) hi = i; });
+  return {
+    label: '近 ' + vals.length + ' 个月月线', n: vals.length, months: vals.length, last,
+    src: 'tencent',
+    pct: vals.filter(x => x <= last).length / vals.length,
+    lo: vals[lo], loAt: rows[lo].day.slice(0, 7),
+    hi: vals[hi], hiAt: rows[hi].day.slice(0, 7),
   };
 }
 
@@ -180,13 +269,14 @@ async function suggest(q) {
   })).filter(r => r.secid && !/Bond|Fund|ETF|Option|Warrant/.test(r.Classify || ''));
 }
 
-/* 找代码：东财优先，云端回空就换新浪。
+/* 找代码：东财优先，云端回空就换新浪（A股），再退腾讯（全市场：A股/港股/美股）。
    注意东财在云端不是报错，是回一段别的 JSONP——解析出来没有 Data 字段，
    等于静默返回空数组，所以必须按「空」降级，不能只 catch 异常。 */
 async function resolveBy(q) {
   let g = [];
   try { g = await suggest(q); } catch (e) { g = []; }
   if (!g.length) { try { g = await sinaSuggest(q); } catch (e) { g = []; } }
+  if (!g.length) { try { g = await tencentSuggest(q); } catch (e) { g = []; } }
   return g;
 }
 
@@ -239,7 +329,7 @@ async function quotes(items) {
     if (!d) return { ...it, ok: false, err: '行情接口没有这只' };
     const cur = /美股|US/.test(it.market || '') ? 'USD' : /港股|HK/.test(it.market || '') ? 'HKD' : 'CNY';
     return {
-      ...it, ok: true,
+      ...it, ok: true, src: 'eastmoney',
       name: String(d.f14 || it.name).replace(/(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])/g, ''),
       price: px(d.f2, it), prev: px(d.f18, it),
       chgPct: num(d.f3) === null ? null : d.f3 / 100,
@@ -271,15 +361,19 @@ async function priceBand(item, months = 60, lastPx = null) {
     const below = vals.filter(x => x <= last).length;
     return {
       label: '近 ' + vals.length + ' 个月月线', n: vals.length, months: vals.length, last,
+      src: 'eastmoney',
       pct: below / vals.length,
       hi: Math.max(...vals), lo: Math.min(...vals),
       hiAt: ks[vals.indexOf(Math.max(...vals))].split(',')[0],
       loAt: ks[vals.indexOf(Math.min(...vals))].split(',')[0],
     };
   } catch (e) {
-    /* 云端 push2his 直接断连，改算新浪日线的分位 —— 口径从月线换成日线，
-       文案要跟着换，不能拿日线冒充「60 个月月线」。 */
-    try { return await sinaBand(item, 1200, lastPx); } catch (e2) { return null; }
+    /* 云端 push2his 直接断连。先试腾讯月线（口径一致，仍是月线）；
+       腾讯也不通再退新浪日线（口径从月线换成约 5 年日线，文案要跟着换）。 */
+    try { return await tencentBand(item, months, lastPx); }
+    catch (e2) {
+      try { return await sinaBand(item, 1200, lastPx); } catch (e3) { return null; }
+    }
   }
 }
 
@@ -335,12 +429,53 @@ async function financialsHK(code) {
   }));
 }
 
+/* 现金流量表：经营现金流 / 资本开支 / 收现。这几个是「增长是白赚还是买来的」的料，
+   只靠利润表答不出来，模型之前只能「留空不猜」——不是数据不存在，是这里没去取。 */
+async function cashflowA(code) {
+  const url = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_DMSK_FN_CASHFLOW' +
+    '&columns=SECURITY_CODE,REPORT_DATE,NETCASH_OPERATE,CONSTRUCT_LONG_ASSET,SALES_SERVICES' +
+    '&filter=' + encodeURIComponent(`(SECURITY_CODE="${code}")`) +
+    '&sortColumns=REPORT_DATE&sortTypes=-1&pageSize=5&source=WEB&client=WEB';
+  const j = await httpJSON(url);
+  const rows = (j && j.result && j.result.data) || [];
+  return rows.map(r => ({
+    period: periodOf(r.REPORT_DATE),
+    ocf: num(r.NETCASH_OPERATE), capex: num(r.CONSTRUCT_LONG_ASSET), cashIn: num(r.SALES_SERVICES),
+  }));
+}
+
+/* 资产负债表：资产负债率 / 货币资金 / 应收账款 / 存货。负债率是提示词「资本消耗」那条直接要的。 */
+async function balanceA(code) {
+  const url = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_DMSK_FN_BALANCE' +
+    '&columns=SECURITY_CODE,REPORT_DATE,TOTAL_ASSETS,TOTAL_LIABILITIES,DEBT_ASSET_RATIO,MONETARYFUNDS,ACCOUNTS_RECE,INVENTORY' +
+    '&filter=' + encodeURIComponent(`(SECURITY_CODE="${code}")`) +
+    '&sortColumns=REPORT_DATE&sortTypes=-1&pageSize=5&source=WEB&client=WEB';
+  const j = await httpJSON(url);
+  const rows = (j && j.result && j.result.data) || [];
+  return rows.map(r => ({
+    period: periodOf(r.REPORT_DATE),
+    debtRatio: num(r.DEBT_ASSET_RATIO),
+    cash: num(r.MONETARYFUNDS), receivables: num(r.ACCOUNTS_RECE), inventory: num(r.INVENTORY),
+  }));
+}
+
 async function financials(item) {
   try {
     if (item.secid.startsWith('idx:')) return [];
-    if (/AStock/.test(item.cls)) return await financialsA(item.code);
+    if (/AStock/.test(item.cls)) {
+      /* 三张表按报告期对齐：利润表 + 现金流量表 + 资产负债表。现金流/负债率拿不到也不报错，那几栏留空。 */
+      const [inc, cf, bal] = await Promise.all([
+        financialsA(item.code),
+        cashflowA(item.code).catch(() => []),
+        balanceA(item.code).catch(() => []),
+      ]);
+      const extra = {};
+      cf.forEach(x => Object.assign(extra[x.period] || (extra[x.period] = {}), x));
+      bal.forEach(x => Object.assign(extra[x.period] || (extra[x.period] = {}), x));
+      return inc.map(f => Object.assign(f, extra[f.period] || {}));
+    }
     if (/UsStock/.test(item.cls)) return await financialsUS(item.code + '.O').then(r => r.length ? r : financialsUS(item.code + '.N'));
-    if (/HKStock/.test(item.cls)) return await financialsHK(item.code);
+    if (/HKStock|^HK$/.test(item.cls)) return await financialsHK(item.code);
   } catch (e) { return []; }
   return [];
 }
@@ -384,7 +519,18 @@ function finBlock(fins, cur) {
     if (num(f.profit) !== null) bits.push(`净利 ${bigMoney(f.profit, f.cur || cur)}` + (num(f.profitYoY) !== null ? `（同比 ${pctText(f.profitYoY, 1)}）` : ''));
     if (num(f.grossMargin) !== null) bits.push(`毛利率 ${f.grossMargin.toFixed(1)}%`);
     if (num(f.roe) !== null) bits.push(`ROE ${f.roe.toFixed(1)}%`);
-    return `  ${f.period}${f.scope === '单季' ? '（单季）' : ''}：` + bits.join('，');
+    /* 增长质量三件：经营现金流、资本开支、资产负债率。比值在服务端算好，模型直接照抄，不逼它自己除。 */
+    const q = [];
+    if (num(f.ocf) !== null) {
+      const ratio = num(f.profit) && Math.abs(f.profit) > 1e6 ? (f.ocf / f.profit * 100) : null;
+      q.push(`经营现金流 ${bigMoney(f.ocf, f.cur || cur)}` + (ratio !== null ? `（占净利 ${ratio.toFixed(0)}%）` : ''));
+    }
+    if (num(f.capex) !== null) {
+      const ratio = num(f.revenue) && Math.abs(f.revenue) > 1e6 ? (f.capex / f.revenue * 100) : null;
+      q.push(`资本开支 ${bigMoney(f.capex, f.cur || cur)}` + (ratio !== null ? `（占营收 ${ratio.toFixed(0)}%）` : ''));
+    }
+    if (num(f.debtRatio) !== null) q.push(`资产负债率 ${f.debtRatio.toFixed(1)}%`);
+    return `  ${f.period}${f.scope === '单季' ? '（单季）' : ''}：` + bits.join('，') + (q.length ? '；' + q.join('，') : '');
   });
   return '\n财报（' + (fins[0].cur === 'USD' ? '美元' : fins[0].cur === 'HKD' ? '港元' : '人民币') +
     '，按报告期倒序）：\n' + lines.join('\n');
@@ -508,5 +654,5 @@ async function announcements(code, n = 5) {
 }
 
 module.exports = { resolve, snapshot, compare, quotes, financials, indexEva, indexEvaAll, priceBand, news, announcements, bigMoney, pctText,
-  /* 备用源单独导出：云端的东财是断的，本地测不到那条路径，直接单测这三个 */
-  sinaSuggest, tencentQuotes, sinaBand };
+  /* 备用源单独导出：云端的东财是断的，本地测不到那条路径，直接单测这些 */
+  sinaSuggest, tencentSuggest, tencentQuotes, sinaBand, tencentBand };
