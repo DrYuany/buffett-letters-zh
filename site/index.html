@@ -1289,7 +1289,7 @@ function entity(kind, name){
         var who = m[3] === 'buffett' ? '巴菲特' : '芒格';
         var tx = m[4];
         if (tx.length > 120) tx = tx.slice(0, 120) + '…';
-        h += '<div class="snip"><span class="go">' + y + ' · ' + sess + '（' + who + '） →</span>' + markIn(tx, name) + '</div>';
+        h += '<div class="snip"><span class="go">' + y + ' · ' + sess + '（' + who + '）</span>' + markIn(tx, name) + '</div>';
       });
       h += '</div>';
     });
@@ -1307,7 +1307,7 @@ function entity(kind, name){
         var who = m[3] === 'buffett' ? '巴菲特' : '芒格';
         var tx = m[4];
         if (tx.length > 120) tx = tx.slice(0, 120) + '…';
-        h += '<div class="snip"><span class="go">' + y + ' · ' + esc(m[1]) + '（' + who + '） →</span>' + markIn(tx, name) + '</div>';
+        h += '<div class="snip"><span class="go">' + y + ' · ' + esc(m[1]) + '（' + who + '）</span>' + markIn(tx, name) + '</div>';
       });
       h += '</div>';
     });
