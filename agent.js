@@ -2040,6 +2040,7 @@ function buildTrace(q, vid, keySource, model, info, errMsg) {
     question: String(q.message || '').slice(0, 2000),
     model: model, web: q.web !== false, mode: q.mode === 'simulate' ? 'simulate' : 'archive',
     bucket: info ? (info.bucket || null) : null,
+    route_ms: info ? (info.route_ms || null) : null,
     key_source: keySource,
     spans: info ? info.spans : [],
     sources: info ? info.sources : [],
@@ -2105,7 +2106,9 @@ function emitSSE(res, q, ip) {
         emit('quota', { left: 0, total: FREE_PER_VISITOR, keySource: 'byo' });
       }
       const wantMode = q.mode === 'simulate' ? 'simulate' : 'archive';
-      /* 每次都由分类调用判定四桶（judgment/lookup/quote/chat）；分类失败退回正则的 archive/simulate。 */
+      /* 每次都由分类调用判定四桶（judgment/lookup/quote/chat）；分类失败退回正则的 archive/simulate。
+         计时：分类器是每次提问多花的一次 flash 调用（推理模型），成本/延迟要进 trace 才看得见。 */
+      const _route0 = Date.now();
       let bucket;
       try {
         bucket = await classifyBucket(q.message, wantMode, apiKey);
@@ -2113,6 +2116,7 @@ function emitSSE(res, q, ip) {
         bucket = triageBucket(q.message) || (triageMode(q.message, wantMode) === 'simulate' ? 'judgment' : 'quote');
         console.log('  [分诊] 分类器失败（' + e.message + '），退回正则：' + bucket);
       }
+      const routeMs = Date.now() - _route0;
       const bucketHint = wantMode === 'simulate' ? 'judgment' : 'quote';
       if (bucket !== bucketHint) console.log(`  [分诊] 前端说 ${wantMode}，按问题内容改走 ${bucket}：${String(q.message).slice(0, 40)}`);
       const info = await runAgent({
@@ -2128,6 +2132,7 @@ function emitSSE(res, q, ip) {
         key: apiKey,
         emit: emit
       });
+      info.route_ms = routeMs;   /* 路由耗时（分类器 + 可能的降级），进 trace 算账 */
       emit('done', info);
       writeTrace(q, vid, keySource, model, info, null);
     } catch (e) {
