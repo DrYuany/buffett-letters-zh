@@ -18,6 +18,10 @@ function loadVar(file, name) {
 const CORE = loadVar('site/data-core.js', 'CORE');
 const LETTERS = loadVar('site/data-letters.js', 'LETTERS');
 const CONTENT = loadVar('site/data-content.js', 'CONTENT');
+/* 懒加载的数据文件：DOM 桩没有 createElement/head，懒加载页(l/e/q/talk/corr)渲染不出。
+   这里预先读进来，runInContext 后直接设成 L/MAUX/CAUX，让这些路由同步渲染、冒烟才能真正测到内容。 */
+const MENTIONS_AUX = fs.existsSync('site/data-mentions.js') ? loadVar('site/data-mentions.js', 'MENTIONS_AUX') : null;
+const CORRECTIONS_AUX = fs.existsSync('site/data-corrections-aux.js') ? loadVar('site/data-corrections-aux.js', 'CORRECTIONS_AUX') : null;
 console.log('CORE 信件数:', CORE.letters.length, '| LETTERS 键数:', Object.keys(LETTERS).length);
 console.log('实体:', CORE.companies.length, '公司', CORE.concepts.length, '概念', CORE.people.length, '人物');
 console.log('记分牌:', CORE.scorecard.length, '| 决策卡:', CORE.decisions.length);
@@ -47,7 +51,7 @@ const document = {
   body: { tagName: 'BODY' },
 };
 const sandbox = {
-  window: { CORE, LETTERS, CONTENT, scrollTo(){}, innerWidth: 1200 },
+  window: { CORE, LETTERS, CONTENT, MENTIONS_AUX, CORRECTIONS_AUX, scrollTo(){}, innerWidth: 1200 },
   document,
   location: { hash: '' },
   console,
@@ -58,6 +62,10 @@ const sandbox = {
 sandbox.window.onhashchange = null;
 vm.createContext(sandbox);
 vm.runInContext(appJs, sandbox, { filename: 'app.js' });
+/* 预载懒加载数据：让 L/MAUX/CAUX 直接指向已读入的数据，懒加载门直接放行 */
+vm.runInContext('L = window.LETTERS || null;', sandbox);
+vm.runInContext('MAUX = window.MENTIONS_AUX || null;', sandbox);
+vm.runInContext('CAUX = window.CORRECTIONS_AUX || null;', sandbox);
 console.log('\n脚本加载: OK');
 
 const routes = [
