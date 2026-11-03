@@ -59,9 +59,14 @@ function loadData() {
     vm.runInContext(fs.readFileSync(path.join(SITE, 'data-mentions.js'), 'utf8'), ctx, { filename: 'data-mentions.js' });
     MAUX = win.MENTIONS_AUX || null;
   } catch (e) { /* 没生成就不展示 */ }
-  return { C: win.CORE, L: win.LETTERS, CT: win.CONTENT, MAUX };
+  let CAUX = null;
+  try {
+    vm.runInContext(fs.readFileSync(path.join(SITE, 'data-corrections-aux.js'), 'utf8'), ctx, { filename: 'data-corrections-aux.js' });
+    CAUX = win.CORRECTIONS_AUX || null;
+  } catch (e) { /* 没生成就不展示 */ }
+  return { C: win.CORE, L: win.LETTERS, CT: win.CONTENT, MAUX, CAUX };
 }
-const { C, L, CT, MAUX } = loadData();
+const { C, L, CT, MAUX, CAUX } = loadData();
 
 /* 与 build.py 的 block_text() / 前端 index.html 的 blockText() 完全一致：
    表格块拼 head + rows，其余取 t */
@@ -932,7 +937,12 @@ async function toolCall(name, args, asOf) {
     }
     case 'corrections': {
       const kw = String(args.topic || '').trim();
-      let list = CT.corrections || [];
+      let list = (CT.corrections || []).map(c => ({ ...c, src: 'letter' }));
+      /* 会议/演讲认错没有信件 loc，只能纯引用，不能点回信 */
+      if (CAUX) {
+        (CAUX.meeting || []).forEach(c => list.push({ y: c.y, k: c.k, t: c.t, ent: c.ent || '', who: c.who, src: 'meeting' }));
+        (CAUX.speech || []).forEach(c => list.push({ y: c.y, k: c.k, t: c.t, ent: c.ent || '', who: c.who, venue: c.venue, src: 'speech' }));
+      }
       if (kw) list = list.filter(c => (c.t + (c.ent || '')).indexOf(kw) >= 0);
       list = list.filter(c => c.y <= YMAX);
       const weight = c => {
@@ -944,9 +954,14 @@ async function toolCall(name, args, asOf) {
       };
       list = list.slice().sort((a, b) => weight(b) - weight(a) || b.y - a.y).slice(0, 6);
       if (!list.length) return { text: '这个话题在认错档案里没找到对应条目。' };
+      const fmt = c => {
+        if (c.src === 'meeting') return `${c.y} 年股东大会（${c.who === 'munger' ? '芒格' : '巴菲特'}）：${c.t}`;
+        if (c.src === 'speech') return `${c.y} 年${c.venue || ''}（巴菲特）：${c.t}`;
+        return `${c.y} 年（${c.k}）：${c.t}\n引用标记：[[${c.loc.l}|${c.loc.b}]]`;
+      };
       return {
-        text: list.map(c => `${c.y} 年（${c.k}）：${c.t}\n引用标记：[[${c.loc.l}|${c.loc.b}]]`).join('\n\n'),
-        sources: list.filter(c => c.loc).map(c => ({ kind: 'letter', l: c.loc.l, b: c.loc.b, y: c.y }))
+        text: list.map(fmt).join('\n\n'),
+        sources: list.filter(c => c.src === 'letter' && c.loc).map(c => ({ kind: 'letter', l: c.loc.l, b: c.loc.b, y: c.y }))
       };
     }
     case 'web_search': {
