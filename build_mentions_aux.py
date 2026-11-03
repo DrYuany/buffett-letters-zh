@@ -19,7 +19,8 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(ROOT)
 
 OUT = 'site'
-CAP = 200
+YEAR_CAP = 6     # 每实体每语料每年最多保留 6 条（保证覆盖摊到所有年份）
+TOTAL_CAP = 500  # 每实体每语料总上限（安全阀，防止极端情况爆表；6/年 × 33 年 ≈ 198，正常不会触顶）
 
 MEETING_PATH = '_src/meeting/meetings_zh.jsonl'
 SPEECH_PATH = '_src/speech/speech.jsonl'
@@ -47,11 +48,11 @@ def scan(rows, kind, surf):
     扫描 buffett/munger 段，对每个实体做字面匹配（任一表面词 in text 即命中）。
     kind: 'meeting' -> 坐标 [y, session, ch, who, snippet]
           'speech'  -> 坐标 [y, venue, i, who, snippet]
-    每实体每语料 CAP 200 条，超出计入 overflow。
-    返回 (mentions, overflow, scanned)。
+    取样策略：每实体每语料按年分组，每年最多保留 YEAR_CAP 条（保持年内行序），
+    再套一个 TOTAL_CAP 总上限作安全阀，超出的计入 overflow。
+    返回 (mentions, overflow, scanned, raw_hits)。
     """
-    mentions = {}
-    overflow = {}
+    by_entity = {}  # name -> {year: [entry, ...]}
     scanned = 0
     for r in rows:
         who = r.get('who')
@@ -77,12 +78,25 @@ def scan(rows, kind, surf):
                 continue
             snip = text[max(0, p - 8): p + 70]
             entry = [y, loc, idx, who, snip]
-            lst = mentions.setdefault(name, [])
-            if len(lst) < CAP:
-                lst.append(entry)
-            else:
-                overflow[name] = overflow.get(name, 0) + 1
-    return mentions, overflow, scanned
+            by_entity.setdefault(name, {}).setdefault(y, []).append(entry)
+
+    mentions = {}
+    overflow = {}
+    raw_hits = 0
+    for name in surf:  # 按 CORE.surf 顺序输出，保证 key 顺序稳定
+        by_year = by_entity.get(name)
+        if not by_year:
+            continue
+        kept = []
+        for y in sorted(by_year):  # 年份升序，年内保持原始行序
+            kept.extend(by_year[y][:YEAR_CAP])
+        raw_hits += sum(len(v) for v in by_year.values())
+        total = len(kept)
+        if total > TOTAL_CAP:
+            overflow[name] = total - TOTAL_CAP
+            kept = kept[:TOTAL_CAP]
+        mentions[name] = kept
+    return mentions, overflow, scanned, raw_hits
 
 
 def dump_js(var, obj, path):
@@ -98,8 +112,8 @@ def main():
     meeting_rows = load_jsonl(MEETING_PATH)
     speech_rows = load_jsonl(SPEECH_PATH)
 
-    m_mentions, m_overflow, m_scanned = scan(meeting_rows, 'meeting', surf)
-    s_mentions, s_overflow, s_scanned = scan(speech_rows, 'speech', surf)
+    m_mentions, m_overflow, m_scanned, m_raw = scan(meeting_rows, 'meeting', surf)
+    s_mentions, s_overflow, s_scanned, s_raw = scan(speech_rows, 'speech', surf)
 
     aux = {
         'meeting': m_mentions,
@@ -114,18 +128,15 @@ def main():
     dump_js('MENTIONS_AUX', aux, os.path.join(OUT, 'data-mentions.js'))
 
     # ---------- 统计 ----------
-    def total_hits(mentions, overflow):
-        stored = sum(len(v) for v in mentions.values())
-        over = sum(overflow.values())
-        return stored + over, stored
+    m_stored = sum(len(v) for v in m_mentions.values())
+    s_stored = sum(len(v) for v in s_mentions.values())
+    m_over = sum(m_overflow.values())
+    s_over = sum(s_overflow.values())
 
-    m_hits, m_stored = total_hits(m_mentions, m_overflow)
-    s_hits, s_stored = total_hits(s_mentions, s_overflow)
-
-    print('会议 扫描段 %d（buffett/munger）| 实体命中实体数 %d | 命中 %d 条（存 %d / 溢出 %d）'
-          % (m_scanned, len(m_mentions), m_hits, m_stored, sum(m_overflow.values())))
-    print('演讲 扫描段 %d（buffett/munger）| 实体命中实体数 %d | 命中 %d 条（存 %d / 溢出 %d）'
-          % (s_scanned, len(s_mentions), s_hits, s_stored, sum(s_overflow.values())))
+    print('会议 扫描段 %d（buffett/munger）| 命中实体 %d | 存 %d 条 | 溢出 %d 条 | 原始命中 %d 条'
+          % (m_scanned, len(m_mentions), m_stored, m_over, m_raw))
+    print('演讲 扫描段 %d（buffett/munger）| 命中实体 %d | 存 %d 条 | 溢出 %d 条 | 原始命中 %d 条'
+          % (s_scanned, len(s_mentions), s_stored, s_over, s_raw))
 
     def top10(mentions, overflow):
         scores = {n: len(v) + overflow.get(n, 0) for n, v in mentions.items()}
