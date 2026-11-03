@@ -488,8 +488,18 @@ decisions = [
  },
 ]
 
+def block_text(b):
+    """和 index.html 里的 blockText() 完全一致：表格块拼 head+rows，其他块取 t"""
+    if b.get('k') == 't':
+        parts = list(b.get('head', []))
+        for r in b.get('rows', []):
+            parts.append(' '.join(r))
+        return ' '.join(parts)
+    return b.get('t', '')
+
 meta = {
  'letters': len(letters), 'chars': sum(l['chars'] for l in letters),
+ 'totChars': sum(len(block_text(b)) for L in LET.values() for b in L['blocks']),
  'years': [min(l['year'] for l in letters), max(l['year'] for l in letters)],
  'companies': len(companies), 'concepts': len(concepts), 'people': len(people),
  'srcRepo': 'github.com/Sphinm/buffett-letters',

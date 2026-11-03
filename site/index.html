@@ -6,7 +6,7 @@
 <title>读巴菲特 · 1956–2025 股东信知识库</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -715,7 +715,7 @@ a.noyr{text-decoration:none;pointer-events:none}
 </style>
 </head>
 <body>
-<div id="boot"><div class="boot-inner"><span class="boot-dot"></span>正在载入股东信全文…<small id="boot-note">首次载入约 5 MB</small></div></div>
+<div id="boot"><div class="boot-inner"><span class="boot-dot"></span>正在载入股东信全文…<small id="boot-note">首次载入约 1.2 MB</small></div></div>
 <button class="hamburger" id="hamb" aria-label="打开导航">☰</button>
 <div class="scrim" id="scrim"></div>
 <aside class="sidebar" id="sidebar">
@@ -737,29 +737,42 @@ a.noyr{text-decoration:none;pointer-events:none}
 </div>
 
 <script>
-/* 8 秒还没撤掉加载提示，说明三个数据文件没读到（八成是没跟 index.html 放同一目录）。
-   file:// 双击打开本身是可以的，别把话说错。 */
+/* 8 秒还没撤掉加载提示，说明数据文件没读到（八成是没跟 index.html 放同一目录）。
+   file:// 双击打开本身是可以的，别把话说错。
+   注意：data-letters.js 已改为懒加载，首屏不需要它，这里只检查 data-core / data-content。 */
 setTimeout(function(){
   var n = document.getElementById('boot-note');
   if (!n) return;
-  n.innerHTML = '载入时间偏长。请确认 <b>data-core.js / data-letters.js / data-content.js</b> '
+  n.innerHTML = '载入时间偏长。请确认 <b>data-core.js / data-content.js</b> '
     + '和 index.html 在同一个目录里；若文件缺失，页面无法显示正文。';
 }, 8000);
 </script>
 <script src="data-core.js"></script>
-<script src="data-letters.js"></script>
 <script src="data-content.js"></script>
 <script>
-var C = window.CORE, L = window.LETTERS, CT = window.CONTENT;
+var C = window.CORE, L = null, CT = window.CONTENT;
+/* data-letters.js 已改为懒加载：只有进读信页/搜索页/对话页/实体页时才动态拉取。
+   首屏只靠 data-core.js（455KB）+ data-content.js（762KB）即可渲染。 */
+var _lettersPromise = null;
+function ensureLetters(){
+  if (L) return Promise.resolve();
+  if (_lettersPromise) return _lettersPromise;
+  _lettersPromise = new Promise(function(resolve, reject){
+    var s = document.createElement('script');
+    s.src = 'data-letters.js';
+    s.onload = function(){ L = window.LETTERS; resolve(); };
+    s.onerror = function(){ _lettersPromise = null; reject(new Error('data-letters.js 加载失败')); };
+    document.head.appendChild(s);
+  });
+  return _lettersPromise;
+}
 /* 语料真实年份范围（第一封是 1956 有限合伙协议，不是 1957） */
 var CY0 = Math.min.apply(null, C.letters.map(function(l){ return l.year; }));
 var CY1 = Math.max.apply(null, C.letters.map(function(l){ return l.year; }));
 var SURFACES = [], EXCLUDE = {};
-/* 全文字数按切块实算（含表格），页脚校验条直接引用，避免文案与数据对不上 */
-var TOTCHARS = 0;
-Object.keys(L).forEach(function(id){
-  L[id].blocks.forEach(function(b){ TOTCHARS += blockText(b).length; });
-});
+/* 全文字数：build.py 预计算写入 C.meta.totChars（含表格 head+rows，和 blockText 口径一致）。
+   以前在这里遍历 LETTERS 实算，现在 LETTERS 懒加载了，改读常量。 */
+var TOTCHARS = C.meta.totChars || 0;
 /* 页脚和首页校验条引用的数字一律运行时算，避免写死后和数据对不上 */
 /* 审计结论：三个数字来自 linkaudit.js / actaudit.js 对 2026-10-30 这一版内容的
    实测输出，浏览器里算不出来，只能写常量。改内容后要重跑两个脚本再改这里。
@@ -2514,6 +2527,19 @@ function render(){
   var sameRoute = (hx === LASTROUTE);
   var app = document.getElementById('app');
   var p = hx.split('/');
+  /* 需要信件原文的路由：读信页(l)、实体出场页(e)、全文搜索(q)、对话页(talk)。
+     LETTERS 懒加载——首屏不拉这 3.5MB，只有进这些页才动态加载。 */
+  var NEEDS_L = {l:1, e:1, q:1, talk:1};
+  if (NEEDS_L[p[1]] && !L){
+    app.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--ink2);font-size:14px">'
+      + '<span class="boot-dot" style="margin-right:8px"></span>正在加载信件原文…</div>';
+    ensureLetters().then(function(){ render(); })
+      .catch(function(e){
+        app.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--ink2)">'
+          + '信件原文加载失败：' + esc(e.message) + '<br><a href="#/">回首页</a></div>';
+      });
+    return;
+  }
   var html = '';
   if (p[1] === 'l') html = letter(dec(p.slice(2).join('/')));
   else if (p[1] === 'y' && p[2]){
@@ -2862,8 +2888,9 @@ function doSearch(q, box){
             s: l.n + ' 段 · ' + (l.chars / 1000).toFixed(1) + ' 千字'});
     }
   });
+  /* 原文搜索依赖 LETTERS（懒加载），未加载时只给实体和信件标题结果 */
   var hit = 0;
-  for (var id in L){
+  if (L) for (var id in L){
     if (hit >= 6) break;
     var bs = L[id].blocks;
     for (var i = 0; i < bs.length; i++){
