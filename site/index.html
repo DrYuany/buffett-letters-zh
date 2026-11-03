@@ -296,6 +296,9 @@ td:first-child,th:first-child{text-align:left}
 .snip{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 14px;
   margin-bottom:6px;font-size:14px;line-height:1.85;color:var(--text);cursor:pointer;transition:.14s}
 .snip:hover{border-color:var(--gold-light);background:#FFFDF8}
+.snip.nolink{cursor:default}
+.snip.nolink:hover{border-color:var(--border);background:var(--panel)}
+.snip.nolink:hover .go{color:var(--ink3)}
 .snip mark{background:#FBEFC6;color:inherit;padding:0 2px;border-radius:2px}
 .snip .go{float:right;font-size:11px;color:var(--ink3);font-family:var(--sans)}
 .snip:hover .go{color:var(--gold)}
@@ -1289,7 +1292,7 @@ function entity(kind, name){
         var who = m[3] === 'buffett' ? '巴菲特' : '芒格';
         var tx = m[4];
         if (tx.length > 120) tx = tx.slice(0, 120) + '…';
-        h += '<div class="snip"><span class="go">' + y + ' · ' + sess + '（' + who + '）</span>' + markIn(tx, name) + '</div>';
+        h += '<div class="snip nolink"><span class="go">' + y + ' · ' + sess + '（' + who + '）</span>' + markIn(tx, name) + '</div>';
       });
       h += '</div>';
     });
@@ -1307,7 +1310,7 @@ function entity(kind, name){
         var who = m[3] === 'buffett' ? '巴菲特' : '芒格';
         var tx = m[4];
         if (tx.length > 120) tx = tx.slice(0, 120) + '…';
-        h += '<div class="snip"><span class="go">' + y + ' · ' + esc(m[1]) + '（' + who + '）</span>' + markIn(tx, name) + '</div>';
+        h += '<div class="snip nolink"><span class="go">' + y + ' · ' + esc(m[1]) + '（' + who + '）</span>' + markIn(tx, name) + '</div>';
       });
       h += '</div>';
     });
@@ -2832,7 +2835,10 @@ function bind(){
     };
   });
   document.querySelectorAll('.snip').forEach(function(el){
-    el.onclick = function(){ go('#/l/' + encodeURIComponent(el.dataset.go) + '?b=' + el.dataset.b); };
+    el.onclick = function(){
+      if (!el.dataset.go) return;   // 会议/演讲等纯展示条目没有 data-go，不导航
+      go('#/l/' + encodeURIComponent(el.dataset.go) + '?b=' + el.dataset.b);
+    };
   });
   document.querySelectorAll('.opt[data-d]').forEach(function(el){
     el.onclick = function(){
