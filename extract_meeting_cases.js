@@ -58,6 +58,9 @@ const uniq = cand.filter(s => {
 const SESSION_ZH = { Morning_Session: '上午场', Afternoon_Session: '下午场', Part_1: '第一场', Part_2_Q: '第二场' };
 function sessZh(s) { return SESSION_ZH[s] || s; }
 
+/* 与 extract_cases.js 的 SLOT_NAMES 保持同一份口径，避免模型胡写槽位 */
+const ALLOWED = ['市场大跌', '市场过热', '并购', '回购', '卖出', '买入', '公司出问题', '业绩变化', '管理层变动', '宏观变化', '分红', '估值'];
+
 const SYS = `你是一个档案整理员，在给一位投资家建"决策案例库"。
 给你若干段他在伯克希尔股东大会上说的话（已标注年份、场次、章节）。
 这些是逐字记录的中文译文，可以逐字引用。
@@ -156,7 +159,9 @@ async function call(batch) {
       /* 会议是逐字可引：judgment 前 12 字对得上 ans 才算 verbatim */
       const verbatim = !!it.judgment && src.ans.indexOf(String(it.judgment).slice(0, 12)) >= 0;
       out.push(Object.assign({}, it, {
+        y: src.y,                       /* 年份以来源段为准，不信模型从上下文猜的 */
         judgment_verbatim: verbatim,
+        slots: (Array.isArray(it.slots) ? it.slots : []).filter(s => ALLOWED.indexOf(s) >= 0),
         src: { kind: 'meeting', y: src.y, session: src.session, ch: src.ch, who: src.who },
       }));
     }
