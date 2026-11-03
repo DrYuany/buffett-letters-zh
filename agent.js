@@ -17,6 +17,7 @@ const path = require('path');
 const os = require('os');
 const vm = require('vm');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const { URL } = require('url');
 
 const ROOT = __dirname;
@@ -417,7 +418,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'open_url',
-      description: '打开一个网页看正文（自动去掉导航和广告），用来核实搜索到的内容。',
+      description: '打开一个网页看正文（自动去掉导航和广告，读前 16000 字）。也能读文本型 PDF 的正文，但扫描版/内嵌字体的 PDF 读不了——那种优先找 HTML 版的研报或年报。用来核实搜索到的内容。',
       parameters: { type: 'object', properties: { url: { type: 'string', description: '完整 http/https 地址' } }, required: ['url'] }
     }
   },
@@ -519,7 +520,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'market_snapshot',
-      description: '拿 A 股标的的确切数字：最新价、涨跌幅、总市值、PE、PB、近五年价格分位，以及最近四期财报（营收、净利、各自同比、毛利率、ROE、经营现金流、资本开支、资产负债率）。给指数名（沪深300、中证白酒、创业板指等）则返回它的 PE/PB 和历史分位。回答任何「现在贵不贵 / 最近怎么样 / 值不值得买 / 怎么看这家公司」之前，必须先调这个拿数。',
+      description: '拿 A 股标的的确切数字：最新价、涨跌幅、总市值、PE、PB、近五年价格分位，最近四期财报（营收、净利、各自同比、毛利率、ROE、经营现金流、资本开支、资产负债率），近 6 年年报趋势，以及分红历史。给指数名（沪深300、中证白酒、创业板指等）则返回它的 PE/PB 和历史分位。回答任何「现在贵不贵 / 最近怎么样 / 值不值得买 / 怎么看这家公司」之前，必须先调这个拿数。',
       parameters: {
         type: 'object',
         properties: {
@@ -758,6 +759,66 @@ function eastmoneyUrl(item) {
   return 'https://quote.eastmoney.com/';
 }
 
+/* ---------------- PDF 正文提取（极简，零依赖） ----------------
+   只认「文本型 PDF」：FlateDecode / 无压缩的内容流，抽 BT…ET 里的 Tj/TJ 文本。
+   扫描版（纯图）和用内嵌 CID 字体的中文 PDF（研报/年报的常态）会提取不到或出乱码，
+   这时返回 null，open_url 会降级明说，绝不把乱码当正文喂给模型。 */
+function pdfUnesc(s) {
+  return String(s || '').replace(/\\([()\\nrtbf])/g, (_, c) =>
+    c === 'n' ? '\n' : c === 'r' ? '' : c === 't' ? ' ' : c === 'b' ? '' : c === 'f' ? '' : c);
+}
+function pdfExtractText(s) {
+  let out = '';
+  const segs = String(s || '').split('BT');
+  for (let k = 1; k < segs.length; k++) {
+    const seg = segs[k].split('ET')[0];
+    let m;
+    const tj = /\(((?:[^()\\]|\\.)*)\)\s*Tj/g;
+    while ((m = tj.exec(seg))) out += pdfUnesc(m[1]);
+    const tjs = /\[((?:[^\[\]\\]|\\.)*)\]\s*TJ/g;
+    while ((m = tjs.exec(seg))) {
+      const parts = m[1].match(/\(((?:[^()\\]|\\.)*)\)/g) || [];
+      out += parts.map(x => pdfUnesc(x.slice(1, -1))).join('');
+    }
+    out += '\n';
+  }
+  return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function pdfText(buf) {
+  try {
+    if (!buf || buf.length < 8 || buf.slice(0, 5).toString('latin1') !== '%PDF-') return null;
+    const startMark = Buffer.from('stream'), endMark = Buffer.from('endstream');
+    const chunks = [];
+    let i = 0;
+    while (i < buf.length) {
+      const s = buf.indexOf(startMark, i);
+      if (s < 0) break;
+      let p = s + 6;
+      if (buf[p] === 0x0d) p++;
+      if (buf[p] === 0x0a) p++;
+      const e = buf.indexOf(endMark, p);
+      if (e < 0) break;
+      let chunk = buf.slice(p, e);
+      const ds = buf.lastIndexOf(Buffer.from('<<'), s);
+      const dict = ds >= 0 && s - ds < 4000 ? buf.slice(ds, s).toString('latin1') : '';
+      if (/FlateDecode/.test(dict) || (chunk.length && (chunk[0] === 0x78))) {
+        try { chunk = zlib.inflateSync(chunk); } catch (e1) { try { chunk = zlib.inflateRawSync(chunk); } catch (e2) {} }
+      }
+      chunks.push(chunk.toString('latin1'));
+      i = e + 9;
+    }
+    const txt = pdfExtractText(chunks.join('\n'));
+    /* 质量门：提取出来要么是空白，要么是 latin1 高字节乱码（CID 字体的中文 PDF）。
+       可打印 ASCII 占比太低就当失败，返回 null 让 open_url 降级。 */
+    if (txt.length < 40) return null;
+    const printable = txt.replace(/[\x20-\x7e\n\t]/g, '').length;
+    if (printable / txt.length > 0.4) return null;
+    return txt.slice(0, 16000);
+  } catch (e) {
+    return null;
+  }
+}
+
 async function toolCall(name, args, asOf) {
   /* 时间闸门：回测时 asOf=1998，1998 年以后的材料一律不给他看。
      这是回测能不能算数的前提 —— 让他"看见"2016 年买苹果，再问他 1998 年怎么判断，
@@ -886,6 +947,20 @@ async function toolCall(name, args, asOf) {
       const r = await fetch(u, { headers: { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' }, redirect: 'follow' });
       if (!r.ok) return { text: '打开失败，页面返回 ' + r.status };
       const buf = Buffer.from(await r.arrayBuffer());
+      /* PDF：极简提取正文。研报/年报常用内嵌字体，可能提取失败，失败就明说、别给乱码。 */
+      const ctype = String(r.headers.get('content-type') || '');
+      const isPdf = /%PDF-/.test(buf.slice(0, 1024).toString('latin1')) || /application\/pdf/.test(ctype);
+      if (isPdf) {
+        const pt = pdfText(buf);
+        if (!pt) {
+          return {
+            text: '这是一个 PDF，本工具只能提取文本型 PDF 的正文，这一份（扫描版或内嵌字体）提取失败。' +
+              '建议找 HTML 版的研报/年报（东财、雪球、新浪的网页版），或用 web_search 搜标题拿摘要。',
+            sources: [{ kind: 'web', title: h.hostname, url: u }]
+          };
+        }
+        return { text: `PDF 正文（提取可能不完整）：\n${pt}`, sources: [{ kind: 'web', title: h.hostname, url: u }] };
+      }
       /* 中文站点不少还在用 GBK，按 utf-8 解出来会一片乱码，先看页面自己声明的编码 */
       const head = buf.slice(0, 1200).toString('latin1');
       const cm = head.match(/charset=["']?\s*([\w-]+)/i);
@@ -901,7 +976,7 @@ async function toolCall(name, args, asOf) {
         .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n));
       txt = txt.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
       const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || ['', ''])[1].trim();
-      return { text: `标题：${title}\n\n正文前 4000 字：\n${txt.slice(0, 4000)}`, sources: [{ kind: 'web', title: h.hostname, url: u }] };
+      return { text: `标题：${title}\n\n正文前 16000 字：\n${txt.slice(0, 16000)}`, sources: [{ kind: 'web', title: h.hostname, url: u }] };
     }
     case 'stance_timeline': {
       const want = String(args.name || '').trim();
@@ -1194,14 +1269,14 @@ function systemPrompt(memNotes, mode, opts) {
 - 第一轮证据不够可以换关键词再查，或改查概念档案、公司轨迹、认错档案。
 - 读者是聪明但没有金融背景的人：术语第一次出现时补一句大白话解释。`;
 
-  if (mode === 'simulate') {
+  if (mode === 'simulate' || mode === 'judgment') {
     return `你是${NAME}的虚拟化身。今天是 ${today}。桌上摊着 ${about}，另有 ${SITUATION ? SITUATION.CASES.length : 0} 条整理好的历史决策案例，只有工具能翻开给你看。${cutoff}
 
 读者会拿今天 A 股的一件事问你——一家公司、一个指数、一条新闻。他要的不是「如果是你会怎么看」的空话，是你真坐下来翻过财报、算过价格之后会给出的那个判断。用第一人称「我」回答，平静、具体、不夸张。
 
 【先拿数，再开口】
 你手上没有今天的行情和财报，凭印象说数字是最丢人的错。开口之前按这个顺序查：
-1. market_snapshot —— 现价、涨跌幅、市值、PE、PB、近五年价格分位，以及最近四期营收、净利、各自同比、毛利率、ROE、经营现金流、资本开支、资产负债率。问的是指数就传指数名，它会返回 PE/PB 的历史分位。
+1. market_snapshot —— 现价、涨跌幅、市值、PE、PB、近五年价格分位，最近四期营收、净利、各自同比、毛利率、ROE、经营现金流、资本开支、资产负债率，外加近 6 年年报趋势和分红历史。问的是指数就传指数名，它会返回 PE/PB 的历史分位。
 2. match_situation —— 把这件事对到旧判断，拿到「尺子」，不是拿答案。
 3. 想知道最近发生了什么（批价、库存、政策、事故、并购、业绩预告、管理层变动、监管处罚），用 market_news 搜公司名或行业名——中文财经资讯比通用搜索准。它和财报要分开说：财报是事实，资讯是别人写的。
 4. 想说「它比同行贵」，必须先 peer_compare，没有参照物就没有贵不贵。
@@ -1256,6 +1331,34 @@ ${work}
 ${reader}
 ${stanceBlock}${mindBlock}
 最后一句必须说清：这是按旧判断推的，不是我对今天这件事的承诺。`;
+  }
+
+  if (mode === 'lookup') {
+    return `你在回答读者查的一个具体数字或事实。今天 ${today}。
+读者不是要你下判断、也不是要你给立场，就是问一个数或一件事实。
+
+【怎么答】
+- 直接给答案，一两句到三四句，别展开成研判，别给「该不该买」。
+- 数字必须先查工具：行情/总市值/PE/PB/财报用 market_snapshot；「X 出现多少次」用 count_mentions；快照里没有的（流通市值、股权结构、某年某月某日价格、股东名单）用 web_search。
+- 查到就写数字 + 出处：market_snapshot 的返回里带「引用标记：[[quote|网址]]」，照抄；web_search 的给链接。
+- 查不到就说清「查了什么、没拿到什么」，别编一个数。
+- 不用【我确实说过】【现在的事实】那套五段结构，这里是问答不是研判。
+${BOUNDS}
+${reader}`;
+  }
+
+  if (mode === 'chat') {
+    return `你是${NAME}的虚拟化身，正在和读者闲聊。今天 ${today}。
+读者这句话不是要你查原话、也不是要你研判某家公司，就是一句常识或闲话。
+
+【怎么答】
+- 用第一人称、像他自己那样自然地答，一两句到三四句，别端着，也别硬把话题拉回投资。
+- 直接用自己的常识答，不用查任何工具。
+- 如果这件事和巴菲特、和投资、和他写过的信没关系，就明说「这不在我信里，是我作为普通人的常识」——别把它包装成他说过的话，也别硬套他的投资观。
+- 不要凭空编 [[ ]] 引用标记，也不要假装这件事写在信里。
+${voiceBlock(opts.noVoice)}
+${BOUNDS}
+${reader}`;
   }
 
   return `你是「巴菲特午餐会」的主持人。桌上摊着 ${about}，只有工具能把它翻开给你看。
@@ -1437,17 +1540,19 @@ async function runAgent(ctx) {
 
   const mem = await readMemory();
   let tools = web ? TOOLS.slice() : TOOLS.filter(t => t.function.name !== 'web_search' && t.function.name !== 'open_url');
-  /* 情形匹配只给分身用；考据模式的工具集保持原样，别把旧评测的口径搅乱。 */
-  if (mode !== 'simulate') tools = tools.filter(t => t.function.name !== 'match_situation' && t.function.name !== 'case_detail');
+  /* 情形匹配只给研判桶用；其余桶（quote/lookup/chat）保持原样，别把旧评测的口径搅乱。 */
+  if (mode !== 'judgment') tools = tools.filter(t => t.function.name !== 'match_situation' && t.function.name !== 'case_detail');
+  /* 闲聊桶：不查任何工具，直接用自己的常识答。 */
+  if (mode === 'chat') tools = [];
   /* 回测：联网和"几十年揉在一起"的档案必须摘掉，否则时间闸门形同虚设 */
   if (asOf) tools = tools.filter(t => ['web_search', 'open_url', 'concept_profile', 'company_timeline'].indexOf(t.function.name) < 0);
   const s = getSession(session);
   s.msgs.push({ role: 'user', content: message });
   if (s.msgs.length > 16) s.msgs = s.msgs.slice(-16);
 
-  /* 先想后说：只给分身用。想不出来（超时、报错）就跳过，不挡着开口。
+  /* 先想后说：只给研判桶用。想不出来（超时、报错）就跳过，不挡着开口。
      前端会收到一条 step，读者看到的是「他在想」，不是六问全文。 */
-  if (mode === 'simulate' && ctx.wantMindset !== false) {
+  if (mode === 'judgment' && ctx.wantMindset !== false) {
     emit('step', { text: '先在心里过一遍：能力圈 / 护城河 / 管理层 / 价格 / 最像的三次 / 我容易错在哪' });
     ctx.mindsetNote = await buildMindset({ question: message, apiKey, model, asOf, anon });
   }
@@ -1471,10 +1576,10 @@ async function runAgent(ctx) {
     emit('delta', { text: txt });
   };
 
-  /* 分身要写满五段，而且这类模型先花两三千 token 在推理上，4096 的预算被推理吃掉一半。
+  /* 研判桶要写满五段，而且这类模型先花两三千 token 在推理上，4096 的预算被推理吃掉一半。
      实测有 5% 的分身答案卡在 length：写到【我怎么量它】中间就停，连【所以】都没出来。
-     考据模式没这个问题（结构短），保持原值，别顺手把成本抬上去。 */
-  const MAXTOK = mode === 'simulate' ? 8192 : 4096;
+     其余桶没这个问题（结构短），保持原值，别顺手把成本抬上去。 */
+  const MAXTOK = mode === 'judgment' ? 8192 : 4096;
   for (rounds = 1; rounds <= MAX_ROUNDS; rounds++) {
     const payload = { model, messages: history, tools, stream: true, max_tokens: MAXTOK, temperature: 0.3 };
     /* 一边收 token 一边发给前端；万一这一轮改主意要去调工具，
@@ -1539,9 +1644,13 @@ async function runAgent(ctx) {
 
   if (!final) {
     /* 循环用尽还没张口：逼它把已经查到的东西说完 */
-    history.push({ role: 'user', content: mode === 'simulate'
+    history.push({ role: 'user', content: mode === 'judgment'
       ? '（工具额度已用尽，请立刻按五段写完：【我确实说过】【现在的事实】【我怎么量它】【所以】【我可能错在哪】，一段都不能少，数字只用手上已有的）'
-      : '（工具额度已用尽，请立刻基于你手上的原文作答，并附上引用标记）' });
+      : mode === 'lookup'
+        ? '（工具额度已用尽，请直接给出你查到的数字并附出处；查不到就明说没查到）'
+        : mode === 'chat'
+          ? '（直接回答读者即可）'
+          : '（工具额度已用尽，请立刻基于你手上的原文作答，并附上引用标记）' });
     const acc = await streamChat({ model: model, messages: history, stream: true, max_tokens: MAXTOK, temperature: 0.3 }, apiKey, onDelta);
     spans.push({ i: spans.length, type: 'llm', round: rounds, forced: true, ms: acc.ms, ttft: acc.ttft,
       finish: acc.finish, prompt_tokens: (acc.usage || {}).prompt_tokens || 0,
@@ -1557,7 +1666,7 @@ async function runAgent(ctx) {
      为什么机械截取而不让模型自己总结：模型「总结自己刚说过什么」经常总结成
      更漂亮但不等于原意的话，下一轮就拿这句漂亮话当立场，越走越偏。
      第一句是他真正下判断的那句，短、硬、可对账。 */
-  if (mode === 'simulate') {
+  if (mode === 'judgment') {
     const h2 = text.indexOf('【按这些依据推演】');
     if (h2 >= 0) {
       const body = text.slice(h2 + '【按这些依据推演】'.length).trim();
@@ -1595,7 +1704,7 @@ async function runAgent(ctx) {
   if (s.msgs.length > 16) s.msgs = s.msgs.slice(-16);
   return { rounds: rounds, calls: calls, usage: final.usage,
     spans: spans, ttft: ttft, ms: Date.now() - t0,
-    answer: text, sources: used, all_sources: allSources };
+    answer: text, sources: used, all_sources: allSources, bucket: mode };
 }
 
 /* 服务端自带的密钥。有它，就是「本机模式」：谁来都不用填密钥，也只花主人的钱。 */
@@ -1716,6 +1825,54 @@ function triageMode(message, mode) {
   if (askPast) return 'archive';
   return (askNow || askView || askDecide) ? 'simulate' : 'archive';
 }
+/* ---------------- 问题类型路由（四桶） ----------------
+   身份（人设）和答题形态要分开：身份由前端按钮定，答题形态由这句话本身定。
+   上面的 triageMode 正则只能认出「考据 vs 研判」，认不出「查一个数」「闲聊一句」——
+   可会话里大量追问正是这两类（上一句问茅台怎么跌、下一句问「茅台为什么叫这个名字」）。
+   所以每次都由一次便宜的分类调用判定四桶之一；分类失败就退回正则的 archive/simulate。 */
+const BUCKETS = ['judgment', 'lookup', 'quote', 'chat'];
+async function classifyBucket(message, wantMode, apiKey) {
+  const sys = `你是对话路由器。判断读者这句话属于哪一类，只输出一个词：judgment / lookup / quote / chat。不要解释，不要标点。
+
+quote —— 问「他（巴菲特）说过/写过/提过什么」：翻信件、股东大会、演讲原文。信号：「他说过」「原话」「哪封信」「提过几次」。
+judgment —— 拿今天 A 股一件事（公司/指数/新闻/价格）要「你怎么看 / 该不该买 / 值不值 / 会不会怎么做」：下判断、给立场。
+lookup —— 查一个具体数字或事实，答案本身是一个数或一句事实：市值、PE、某年利润、某词出现几次、哪年成立、创始人是谁、流通市值是多少。不要立场。
+chat —— 与投资、与信件无关的常识或闲聊，以及起名/来历题：「茅台为什么取这个名字」「茅台名字的由来」「今天天气」「你是谁」。
+
+边界示例（照这个判）：
+「茅台为什么取这个名字」→ chat
+「茅台名字是怎么来的」→ chat
+「茅台流通市值是多少」→ lookup
+「茅台 PE 是多少」→ lookup
+「巴菲特提过几次保险浮存金」→ quote
+「茅台跌了你怎么看」→ judgment
+「茅台现在该不该买」→ judgment
+「可口可乐哪年上市的」→ lookup
+
+规则：
+- 追问按追问本身判，别被上一句带偏。
+- 起名/来历/名字由来（「为什么叫」「为什么取」「名字是怎么来的」「命名的由来」）一律 chat，不管主语是不是股票或公司。
+- 「XX 是多少」「XX 出现过几次」「XX 哪年成立」是 lookup。
+- 「该不该买」「值不值」「会不会涨」「你怎么看」是 judgment。
+- 拿不准是不是要翻他原话时，归 quote。`;
+  const usr = '读者说：' + String(message || '').slice(0, 600) +
+    (wantMode === 'simulate' ? '\n（读者当前在「问分身」模式，但以这句话本身为准，模式只作弱参考）' : '');
+  const r = await fetch(DEEPSEEK, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'deepseek-flash',
+      messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }],
+      temperature: 0, max_tokens: 12, stream: false,
+    }),
+  });
+  if (!r.ok) throw new Error('分类服务返回 ' + r.status);
+  const j = await r.json();
+  const t = ((j.choices && j.choices[0] && j.choices[0].message.content) || '').toLowerCase();
+  const hit = BUCKETS.find(b => t.indexOf(b) >= 0);
+  if (!hit) throw new Error('分类结果无法识别：' + t);
+  return hit;
+}
 /* 答案里的引用标记 [[信|段]] / [[web|url]] —— 判「引用存不存在」就从这里下手。
    注意「信」那一截是信件 id（形如「2018 巴菲特致股东信」），不是数字下标。 */
 /* URL 型引用标记的类别：[[web|…]] 通用网页、[[quote|…]] 行情/财报、[[news|…]] 资讯。
@@ -1822,6 +1979,7 @@ function buildTrace(q, vid, keySource, model, info, errMsg) {
     vid_hash: hashId(vid),
     question: String(q.message || '').slice(0, 2000),
     model: model, web: q.web !== false, mode: q.mode === 'simulate' ? 'simulate' : 'archive',
+    bucket: info ? (info.bucket || null) : null,
     key_source: keySource,
     spans: info ? info.spans : [],
     sources: info ? info.sources : [],
@@ -1887,15 +2045,23 @@ function emitSSE(res, q, ip) {
         emit('quota', { left: 0, total: FREE_PER_VISITOR, keySource: 'byo' });
       }
       const wantMode = q.mode === 'simulate' ? 'simulate' : 'archive';
-      const effMode = triageMode(q.message, wantMode);
-      if (effMode !== wantMode) console.log(`  [分诊] 前端说 ${wantMode}，按问题内容改走 ${effMode}：${String(q.message).slice(0, 40)}`);
+      /* 每次都由分类调用判定四桶（judgment/lookup/quote/chat）；分类失败退回正则的 archive/simulate。 */
+      let bucket;
+      try {
+        bucket = await classifyBucket(q.message, wantMode, apiKey);
+      } catch (e) {
+        bucket = triageMode(q.message, wantMode) === 'simulate' ? 'judgment' : 'quote';
+        console.log('  [分诊] 分类器失败（' + e.message + '），退回正则：' + bucket);
+      }
+      const bucketHint = wantMode === 'simulate' ? 'judgment' : 'quote';
+      if (bucket !== bucketHint) console.log(`  [分诊] 前端说 ${wantMode}，按问题内容改走 ${bucket}：${String(q.message).slice(0, 40)}`);
       const info = await runAgent({
         message: String(q.message || '').slice(0, 2000),
         session: String(q.session || 'default').slice(0, 40),
         /* 默认走快的那个：坐着聊天等 40 秒太长。想要更细的推理再选 pro。 */
         model: model,
         web: q.web !== false,
-        mode: effMode,
+        mode: bucket,
         asOf: q.as_of || '',
         anon: q.anon === true || q.anon === 1,
         wantMindset: q.mindset !== false,

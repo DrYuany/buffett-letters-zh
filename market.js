@@ -444,10 +444,10 @@ async function cashflowA(code) {
   }));
 }
 
-/* 资产负债表：资产负债率 / 货币资金 / 应收账款 / 存货。负债率是提示词「资本消耗」那条直接要的。 */
+/* 资产负债表：资产负债率 / 货币资金 / 应收账款 / 存货 / 短期借款。负债率是提示词「资本消耗」那条直接要的。 */
 async function balanceA(code) {
   const url = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_DMSK_FN_BALANCE' +
-    '&columns=SECURITY_CODE,REPORT_DATE,TOTAL_ASSETS,TOTAL_LIABILITIES,DEBT_ASSET_RATIO,MONETARYFUNDS,ACCOUNTS_RECE,INVENTORY' +
+    '&columns=SECURITY_CODE,REPORT_DATE,TOTAL_ASSETS,TOTAL_LIABILITIES,DEBT_ASSET_RATIO,MONETARYFUNDS,ACCOUNTS_RECE,INVENTORY,SHORT_LOAN' +
     '&filter=' + encodeURIComponent(`(SECURITY_CODE="${code}")`) +
     '&sortColumns=REPORT_DATE&sortTypes=-1&pageSize=5&source=WEB&client=WEB';
   const j = await httpJSON(url);
@@ -456,7 +456,50 @@ async function balanceA(code) {
     period: periodOf(r.REPORT_DATE),
     debtRatio: num(r.DEBT_ASSET_RATIO),
     cash: num(r.MONETARYFUNDS), receivables: num(r.ACCOUNTS_RECE), inventory: num(r.INVENTORY),
+    shortLoan: num(r.SHORT_LOAN),
   }));
+}
+
+/* 近 6 年年度数据（12-31 报告期）：看趋势用，不用季度累计口径。 */
+async function annualsA(code) {
+  const base = 'https://datacenter-web.eastmoney.com/api/data/v1/get?';
+  const f = encodeURIComponent(`(SECURITY_CODE="${code}")`);
+  const inc = await httpJSON(base + 'reportName=RPT_LICO_FN_CPD&columns=SECURITY_CODE,REPORTDATE,TOTAL_OPERATE_INCOME,YSTZ,PARENT_NETPROFIT,SJLTZ,XSMLL,WEIGHTAVG_ROE&filter=' + f + '&sortColumns=REPORTDATE&sortTypes=-1&pageSize=24&source=WEB&client=WEB');
+  const cf = await httpJSON(base + 'reportName=RPT_DMSK_FN_CASHFLOW&columns=SECURITY_CODE,REPORT_DATE,NETCASH_OPERATE,CONSTRUCT_LONG_ASSET&filter=' + f + '&sortColumns=REPORT_DATE&sortTypes=-1&pageSize=24&source=WEB&client=WEB');
+  const bal = await httpJSON(base + 'reportName=RPT_DMSK_FN_BALANCE&columns=SECURITY_CODE,REPORT_DATE,DEBT_ASSET_RATIO&filter=' + f + '&sortColumns=REPORT_DATE&sortTypes=-1&pageSize=24&source=WEB&client=WEB');
+  const annual = rows => (rows || []).filter(r => /12-31$/.test(String(r.REPORTDATE || r.REPORT_DATE || '').slice(0, 10)));
+  const ir = annual((inc && inc.result && inc.result.data) || []);
+  const cr = annual((cf && cf.result && cf.result.data) || []);
+  const br = annual((bal && bal.result && bal.result.data) || []);
+  const extra = {};
+  cr.forEach(r => { const p = periodOf(r.REPORT_DATE); extra[p] = Object.assign(extra[p] || {}, { ocf: num(r.NETCASH_OPERATE), capex: num(r.CONSTRUCT_LONG_ASSET) }); });
+  br.forEach(r => { const p = periodOf(r.REPORT_DATE); extra[p] = Object.assign(extra[p] || {}, { debtRatio: num(r.DEBT_ASSET_RATIO) }); });
+  return ir.slice(0, 6).map(r => {
+    const p = periodOf(r.REPORTDATE);
+    return Object.assign({
+      year: +String(p).slice(0, 4),
+      revenue: num(r.TOTAL_OPERATE_INCOME), revYoY: num(r.YSTZ),
+      profit: num(r.PARENT_NETPROFIT), profitYoY: num(r.SJLTZ),
+      grossMargin: num(r.XSMLL), roe: num(r.WEIGHTAVG_ROE),
+      cur: 'CNY',
+    }, extra[p] || {});
+  });
+}
+
+/* 分红历史：每 10 股派息（税前）+ 除权除息日。资本配置这一格。 */
+async function dividendsA(code) {
+  const url = 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_SHAREBONUS_DET' +
+    '&columns=SECURITY_CODE,REPORT_DATE,PRETAX_BONUS_RMB,BONUS_IT_RATIO,EX_DIVIDEND_DATE,ASSIGN_PROGRESS' +
+    '&filter=' + encodeURIComponent(`(SECURITY_CODE="${code}")`) +
+    '&sortColumns=REPORT_DATE&sortTypes=-1&pageSize=6&source=WEB&client=WEB';
+  const j = await httpJSON(url);
+  const rows = (j && j.result && j.result.data) || [];
+  return rows.map(r => ({
+    year: String(r.REPORT_DATE || '').slice(0, 4),
+    pretax: num(r.PRETAX_BONUS_RMB), bonusIt: num(r.BONUS_IT_RATIO),
+    exDate: String(r.EX_DIVIDEND_DATE || '').slice(0, 10),
+    progress: String(r.ASSIGN_PROGRESS || ''),
+  })).filter(r => r.year);
 }
 
 async function financials(item) {
@@ -530,10 +573,42 @@ function finBlock(fins, cur) {
       q.push(`资本开支 ${bigMoney(f.capex, f.cur || cur)}` + (ratio !== null ? `（占营收 ${ratio.toFixed(0)}%）` : ''));
     }
     if (num(f.debtRatio) !== null) q.push(`资产负债率 ${f.debtRatio.toFixed(1)}%`);
+    if (num(f.cash) !== null || num(f.shortLoan) !== null) {
+      q.push('货币资金 ' + (num(f.cash) !== null ? bigMoney(f.cash, f.cur || cur) : '—') +
+        (num(f.shortLoan) !== null ? '，短期借款 ' + bigMoney(f.shortLoan, f.cur || cur) : ''));
+    }
     return `  ${f.period}${f.scope === '单季' ? '（单季）' : ''}：` + bits.join('，') + (q.length ? '；' + q.join('，') : '');
   });
   return '\n财报（' + (fins[0].cur === 'USD' ? '美元' : fins[0].cur === 'HKD' ? '港元' : '人民币') +
     '，按报告期倒序）：\n' + lines.join('\n');
+}
+
+/* 近 6 年年度趋势：营收/净利/毛利率/ROE/经营现金流/资本开支/负债率，一年一行。 */
+function annualBlock(rows) {
+  if (!rows || rows.length < 2) return '';
+  const lines = rows.map(f => {
+    const bits = [
+      `营收 ${bigMoney(f.revenue, 'CNY')}` + (num(f.revYoY) !== null ? `（${pctText(f.revYoY, 0)}）` : ''),
+      `净利 ${bigMoney(f.profit, 'CNY')}` + (num(f.profitYoY) !== null ? `（${pctText(f.profitYoY, 0)}）` : ''),
+    ];
+    if (num(f.grossMargin) !== null) bits.push(`毛利率 ${f.grossMargin.toFixed(1)}%`);
+    if (num(f.roe) !== null) bits.push(`ROE ${f.roe.toFixed(1)}%`);
+    if (num(f.ocf) !== null) bits.push(`经营现金流 ${bigMoney(f.ocf, 'CNY')}`);
+    if (num(f.capex) !== null) bits.push(`资本开支 ${bigMoney(f.capex, 'CNY')}`);
+    if (num(f.debtRatio) !== null) bits.push(`负债率 ${f.debtRatio.toFixed(0)}%`);
+    return `  ${f.year}：` + bits.join('，');
+  });
+  return `\n近 ${rows.length} 年（年报口径，人民币）：\n` + lines.join('\n');
+}
+
+/* 分红历史：每 10 股派息（税前）+ 除权日。没怎么分红的公司这里会很短或没有。 */
+function divBlock(rows) {
+  if (!rows || !rows.length) return '';
+  const lines = rows.map(d =>
+    `  ${d.year}：每 10 股派 ${d.pretax != null ? d.pretax.toFixed(2) : '—'} 元（税前）` +
+    (d.bonusIt ? `，每 10 股送转 ${d.bonusIt.toFixed(1)}` : '') +
+    (d.exDate && d.exDate !== '1970-01-01' ? `，除权除息 ${d.exDate}` : ''));
+  return '\n分红历史（近 ' + rows.length + ' 次，按年度倒序）：\n' + lines.join('\n');
 }
 
 /* 主入口：一次把一个标的能拿到的都拿到，组装成模型能直接读的事实块 */
@@ -566,8 +641,15 @@ async function snapshot(q, opt = {}) {
   const quote = qs[0];
   if (!quote || !quote.ok) return { ok: false, err: (quote && quote.err) || '行情没拿到', at, cand: cands.slice(0, 4) };
 
+  const isA = /AStock/.test(it.cls);
   const fins = opt.financials === false ? [] : await financials(it);
   const band = opt.band === false ? null : await priceBand(it, 60, quote.price);
+  /* 年度趋势 + 分红：给「趋势好不好 / 资本配置」用的，peer_compare 传 financials:false 时会跳过。 */
+  let annuals = [], divs = [];
+  if (opt.financials !== false && isA) {
+    annuals = await annualsA(quote.code).catch(() => []);
+    divs = await dividendsA(quote.code).catch(() => []);
+  }
 
   const L = [];
   L.push(`标的：${quote.name}（${quote.code} · ${quote.market || it.market}）`);
@@ -588,12 +670,14 @@ async function snapshot(q, opt = {}) {
     L.push(`  当前处在 ${(band.pct * 100).toFixed(0)}% 分位；区间 ${band.lo.toFixed(2)}（${band.loAt}）到 ${band.hi.toFixed(2)}（${band.hiAt}）`);
   }
   if (fins.length) L.push(finBlock(fins, quote.cur));
-  if (opt.ann !== false && /AStock/.test(it.cls)) {
+  if (annuals.length >= 2) L.push(annualBlock(annuals));
+  if (divs.length) L.push(divBlock(divs));
+  if (opt.ann !== false && isA) {
     const ann = await announcements(quote.code, 3).catch(() => []);
     if (ann.length) L.push('\n最近公告：\n' + ann.map(a => `  ${a.date}　${a.title}`).join('\n'));
   }
 
-  return { ok: true, kind: 'stock', item: it, quote, fins, band, text: L.join('\n'), at, cand: cands.slice(0, 5) };
+  return { ok: true, kind: 'stock', item: it, quote, fins, annuals, divs, band, text: L.join('\n'), at, cand: cands.slice(0, 5) };
 }
 
 /* 一次比多家：模型问「它和同行比贵不贵」时用 */
