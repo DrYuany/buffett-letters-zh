@@ -2152,6 +2152,16 @@ function talkBase(){
   TM.base = (location.protocol === 'http:' || location.protocol === 'https:') ? '' : 'http://127.0.0.1:8099';
   return TM.base;
 }
+/* 分享码：发布到线上以后，网关只放行带 ?sharecode=xxx 的请求 —— 连 /api/* 也拦。
+   页面是从那个链接打开的，所以码在 location.search 里；每一条接口请求都得把它捎上，
+   否则探活和提问都会被挡回「链接不完整」的 HTML，页面就只剩离线检索。
+   本机 127.0.0.1 上没有码，这个函数原样返回。 */
+function talkSign(u){
+  var m;
+  try { m = /[?&]sharecode=([^&#]+)/.exec(location.search); } catch (e) { return u; }
+  if (!m) return u;
+  return u + (u.indexOf('?') >= 0 ? '&' : '?') + 'sharecode=' + m[1];
+}
 function talkProbe(){
   if (TM.probeP) return TM.probeP;
   var seen = {}, tries = [];
@@ -2164,7 +2174,7 @@ function talkProbe(){
       return Promise.resolve(false);
     }
     var b = tries[n++];
-    return fetch(b + '/api/health?vid=' + encodeURIComponent(TVID), { cache: 'no-store' }).then(function(r){ return r.json(); })
+    return fetch(talkSign(b + '/api/health?vid=' + encodeURIComponent(TVID)), { cache: 'no-store' }).then(function(r){ return r.json(); })
       .then(function(j){
         /* 服务端自带密钥（本机/线上带额度的实例）是 builtin；公网实例没有密钥，是 byo（访问者自带），
            两种都算「服务活着」。builtin 会附带 freeLeft（还剩几次免费）。 */
@@ -2408,7 +2418,7 @@ function talkStream(q, idx){
   var stop = document.getElementById('talk-stop');
   if (stop) stop.style.display = 'inline-block';
   TM.ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
-  fetch(talkBase() + '/api/chat', {
+  fetch(talkSign(talkBase() + '/api/chat'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: q, session: TALK.session, web: TM.web, model: TM.model,
@@ -2596,7 +2606,7 @@ function bind(){
     };
     var tf = document.getElementById('talk-forget');
     if (tf) tf.onclick = function(){
-      fetch(talkBase() + '/api/memory', { method: 'DELETE' }).then(function(){
+      fetch(talkSign(talkBase() + '/api/memory'), { method: 'DELETE' }).then(function(){
         tf.parentNode.innerHTML = '已经让他忘掉关于你的一切了。';
       }).catch(function(){
         tf.parentNode.innerHTML = '清不掉（本地服务没起来），记忆还在 agent-memory.json 里。';
