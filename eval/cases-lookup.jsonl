@@ -1,0 +1,15 @@
+{"id":"lk-001","layer":"lookup","q":"贵州茅台现在的市盈率是多少？","expect_tools":["market_snapshot"],"rubric":"给一个数+出处，不展开研判，不给「该不该买」"}
+{"id":"lk-002","layer":"lookup","q":"宁德时代现在的总市值是多少？","expect_tools":["market_snapshot"],"rubric":"查市值，数来自行情接口"}
+{"id":"lk-003","layer":"lookup","q":"比亚迪现在的股价是多少？","expect_tools":["market_snapshot"],"rubric":"查现价，数来自行情接口"}
+{"id":"lk-004","layer":"lookup","q":"腾讯控股现在的市值是多少？","expect_tools":["market_snapshot"],"rubric":"港股查数，验收新数据源"}
+{"id":"lk-005","layer":"lookup","q":"苹果公司现在的市值是多少？","expect_tools":["market_snapshot"],"rubric":"美股查数，验收新数据源"}
+{"id":"lk-006","layer":"lookup","q":"他提到过几次「护城河」？","expect_tools":["count_mentions"],"rubric":"次数必须来自工具返回，不得估算"}
+{"id":"lk-007","layer":"lookup","q":"「内在价值」这个词在他信里大概出现了多少次？","expect_tools":["count_mentions"],"rubric":"统计题，走 count_mentions"}
+{"id":"lk-008","layer":"lookup","q":"伯克希尔现在的现金储备是多少？","expect_tools":["web_search"],"rubric":"实时数字，须联网并标注网络来源"}
+{"id":"lk-009","layer":"lookup","q":"巴菲特是哪一年出生的？","expect_tools":["web_search"],"rubric":"一句事实，直接给，不翻信"}
+{"id":"lk-010","layer":"lookup","q":"伯克希尔·哈撒韦是哪一年成立的？","expect_tools":["web_search"],"rubric":"一句事实"}
+{"id":"lk-011","layer":"lookup","q":"贵州茅台 2025 年的营收是多少？","expect_tools":["market_snapshot"],"rubric":"财报数字，来自定期报告"}
+{"id":"lk-012","layer":"lookup","q":"沪深300 现在的 PE 是多少？","expect_tools":["market_snapshot"],"rubric":"指数估值，数来自蛋卷估值"}
+{"id":"lk-013","layer":"lookup","q":"特斯拉现在的市盈率是多少？","expect_tools":["market_snapshot"],"rubric":"美股查数，TTM 口径"}
+{"id":"lk-014","layer":"lookup","q":"工商银行现在的股息率是多少？","expect_tools":["market_snapshot"],"rubric":"查一个数"}
+{"id":"lk-015","layer":"lookup","q":"他持有可口可乐多少年了？","expect_tools":["search_letters"],"rubric":"跨年事实，从原文/档案拿，给具体年数"}
