@@ -624,7 +624,7 @@ a.noyr{text-decoration:none;pointer-events:none}
   border-radius:6px;cursor:pointer;font-family:var(--sans);white-space:nowrap}
 .tp-mode-btn.on{background:var(--gold);color:#fff;font-weight:600}
 .tp-mode-btn:hover:not(.on){color:var(--gold)}
-.tp-event{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 8px;
+.tp-event{display:grid;grid-template-columns:1fr;gap:8px;margin:0 0 8px;
   padding:10px 12px;border:1px solid var(--line2);border-radius:9px;background:var(--bg2)}
 .tp-event.off{opacity:.55}
 .tp-event-h{grid-column:1/-1;font-size:11.5px;color:var(--ink3);line-height:1.6}
@@ -1792,7 +1792,7 @@ function rules(){
    连同年份和段落号贴回来，每条都能点回原信。
    这个体量（130 万字、8 千段）不需要向量库：字面检索就够快，
    也没有 embedding 的构建、存储和调用成本；真接大模型时再把这里的 top-k 当上下文即可。 */
-var TALK = { msgs: [], draft: '', evFact: '', evGuess: '', lastEnt: '', lastQ: '', asked: '', busy: false, seen: {},
+var TALK = { msgs: [], draft: '', evFact: '', lastEnt: '', lastQ: '', asked: '', busy: false, seen: {},
   session: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
 
 /* 线描茶杯：不依赖 emoji 字体，深浅背景下都能看清 */
@@ -2320,8 +2320,8 @@ function talkSubText(){
 }
 function talkEventHint(){
   return TM.modeAsk === 'simulate'
-    ? '<b>分身模式</b> · 把今天发生的事实写清楚，模型不许替你补事实；右边写你想问的，留空就默认问「你会怎么想？」'
-    : '这两栏只在「问分身」模式下使用 · 当前是「查原话」模式';
+    ? '<b>分身模式</b> · 先写清楚今天发生了什么，再在下面问他怎么看（不问就默认「你会怎么想？」）'
+    : '这栏只在「问分身」模式下使用 · 当前是「查原话」模式';
 }
 /* 切模式绝不整页 render：审计脚本会真点每个按钮，重绘会把正在点的元素换成 0×0 的幽灵。
    只改类名、提示文字和 placeholder。 */
@@ -2358,7 +2358,6 @@ function talkPage(){
       '<div class="tp-event' + (TM.modeAsk === 'simulate' ? '' : ' off') + '" id="talk-event">' +
         '<div class="tp-event-h" id="talk-event-h">' + talkEventHint() + '</div>' +
         '<input id="talk-fact" type="text" autocomplete="off" placeholder="发生的事实：例如某白酒龙头三季度业绩低于预期，今天跌停" value="' + esc(TALK.evFact) + '">' +
-        '<input id="talk-guess" type="text" autocomplete="off" placeholder="我想问的（可留空）：例如你会怎么想？" value="' + esc(TALK.evGuess) + '">' +
       '</div>' +
       '<div class="tp-composer">' +
         '<button class="tp-new" id="talk-new">+ 新对话</button>' +
@@ -2401,13 +2400,12 @@ function talkAsk(q){
   q = String(q || '').trim();
   var sim = (TM.modeAsk === 'simulate');
   var fact = (((document.getElementById('talk-fact') || {}).value) || TALK.evFact || '').trim();
-  var guess = (((document.getElementById('talk-guess') || {}).value) || TALK.evGuess || '').trim();
   if ((!q && !(sim && fact)) || TALK.busy) return;
-  /* 分身模式把「事实」和「想问的」分开发：事实由读者给，不许模型自己补 */
+  /* 分身模式：事实由读者亲手给，不许模型自己补；想问什么统一走下面的大输入框 */
   var qFull = q;
   if (sim){
     qFull = (fact ? '【今天发生的事实】' + fact : '（读者没有填写今天的事实）') +
-      '\n【我想问的】' + (q || guess || '你会怎么想？');
+      '\n【我想问的】' + (q || '你会怎么想？');
   }
   TALK.busy = true;
   TALK.draft = '';
@@ -2688,7 +2686,7 @@ function bind(){
     tin.style.height = tin.scrollHeight + 'px';
     document.getElementById('talk-send').onclick = function(){ talkAsk(tin.value); };
     document.getElementById('talk-new').onclick = function(){
-      TALK.msgs = []; TALK.draft = ''; TALK.evFact = ''; TALK.evGuess = '';
+      TALK.msgs = []; TALK.draft = ''; TALK.evFact = '';
       TALK.lastEnt = ''; TALK.lastQ = ''; TALK.asked = ''; TALK.seen = {};
       /* 换会话 = 换一段新的上下文，但长期记忆是跨会话的，不清 */
       TALK.session = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -2703,8 +2701,6 @@ function bind(){
     if (ms) ms.onclick = function(){ talkSetMode('simulate'); };
     var ef = document.getElementById('talk-fact');
     if (ef) ef.oninput = function(){ TALK.evFact = ef.value; };
-    var eg = document.getElementById('talk-guess');
-    if (eg) eg.oninput = function(){ TALK.evGuess = eg.value; };
     var tw = document.getElementById('talk-web');
     if (tw) tw.onchange = function(){ TM.web = !!tw.checked; };
     var tp = document.getElementById('talk-pro');
