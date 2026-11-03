@@ -34,7 +34,13 @@ const body = cut >= 0 ? src.slice(0, cut) : src;
 const realRequire = require;
 const patchedRequire = p => (p && p.startsWith('./') ? realRequire(path.join(ROOT, p)) : realRequire(p));
 const quiet = { log: () => {}, warn: () => {}, error: console.error.bind(console) };
-const ctx = { require: patchedRequire, console: quiet, module: {}, process, __dirname: ROOT };
+/* vm 上下文默认不带 Node 的 web/网络全局，classifyBucket 里的 fetch 会 ReferenceError，
+   把常用的全局一并塞进去。 */
+const ctx = {
+  require: patchedRequire, console: quiet, module: {}, process, __dirname: ROOT,
+  fetch, AbortController, AbortSignal, TextDecoder, TextEncoder,
+  URL, URLSearchParams, Buffer, setTimeout, clearTimeout, setInterval, clearInterval,
+};
 vm.createContext(ctx);
 vm.runInContext(body + '\n;globalThis.__exp = { classifyBucket, triageMode, BUCKETS };', ctx, { filename: 'agent-slice.js' });
 const { classifyBucket, triageMode, BUCKETS } = ctx.__exp;
