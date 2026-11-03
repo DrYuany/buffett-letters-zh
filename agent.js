@@ -1639,6 +1639,28 @@ const server = http.createServer(async (req, res) => {
           }
         } catch (e) { out.steps.push({ step: 'throw', message: e.message }); }
       }
+      /* 云端出口把东财拦得五花八门：searchapi 回一段不相干的 JSONP，push2 直接断连。
+         这里逐个探备选源，谁通就用谁。 */
+      const PROBE = [
+        ['tencent-quote', 'https://qt.gtimg.cn/q=sh600519', 'https://finance.qq.com'],
+        ['sina-quote', 'https://hq.sinajs.cn/list=sh600519', 'https://finance.sina.com.cn'],
+        ['sina-suggest', 'https://suggest3.sinajs.cn/suggest/type=11,12,15&key=' + encodeURIComponent(q), 'https://finance.sina.com.cn'],
+        ['tencent-kline', 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh600519,month,,,60,qfq', 'https://finance.qq.com'],
+        ['em-delay', 'https://push2delay.eastmoney.com/api/qt/ulist.np/get?secids=1.600519&fields=f2,f3,f12,f14,f9,f23,f114,f115,f20', 'https://quote.eastmoney.com/'],
+        ['em-datacenter', 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_LICO_FN_CPD&columns=ALL&filter=(SECURITY_CODE%3D%22600519%22)&pageSize=3&sortColumns=REPORTDATE&sortTypes=-1', 'https://data.eastmoney.com/'],
+      ];
+      for (const [name, url, ref] of PROBE) {
+        const t0 = Date.now();
+        try {
+          const r = await fetch(url, { headers: { 'User-Agent': UA, Referer: ref }, signal: AbortSignal.timeout(8000) });
+          const buf = Buffer.from(await r.arrayBuffer());
+          let txt;
+          try { txt = new TextDecoder('gbk').decode(buf); } catch (e2) { txt = buf.toString('utf8'); }
+          out.steps.push({ step: 'probe:' + name, ms: Date.now() - t0, status: r.status, len: buf.length, head: txt.replace(/\s+/g, ' ').slice(0, 170) });
+        } catch (e) {
+          out.steps.push({ step: 'probe:' + name, ms: Date.now() - t0, status: 0, err: e.message });
+        }
+      }
       return json(res, 200, out);
     }
     let p = decodeURIComponent(u.pathname === '/' ? '/index.html' : u.pathname);
