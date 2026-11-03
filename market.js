@@ -15,7 +15,7 @@
    2. 单位在这里统一换算成人话（元/美元/港元、亿、%），不给模型留换算余地。
 */
 
-const { fetchJSON, fetchText } = require('./net');
+const { fetchJSON, fetchText, UA } = require('./net');
 
 const REF = 'https://quote.eastmoney.com/';
 const TTL = 3 * 60 * 1000;          /* 行情缓存 3 分钟：同一轮回答里多次调用不重复打接口 */
@@ -23,6 +23,106 @@ const _cache = new Map();
 
 async function httpJSON(url, ms = 9000) {
   return fetchJSON(url, { timeout: ms, headers: { Referer: REF, Accept: 'application/json, text/plain, */*' } });
+}
+
+/* ---------- 备用源：云端出口访问不了东财时用 ----------
+
+   同一个接口，本机和云端拿到的完全不是一回事（2026-11-03 实测）：
+   - searchapi 在云端回一段不相干的 JSONP（内容是「达利食品」的用户搜索结果，
+     回调名里的时间戳还是 2023 年的），push2 / push2his 直接 socket hang up；
+   - datacenter-web 和蛋卷是通的，所以财报、指数估值不受影响。
+   腾讯和新浪在云端都正常。
+
+   分工：找代码用新浪 suggest3，取行情用腾讯 qt.gtimg.cn，价格分位用新浪日线。
+   腾讯的 PE(TTM)/PB/总市值和东财逐位对得上（茅台 22.18 / 6.72 / 18221.94 亿），
+   但它只有一个 PE 口径，另外两个留空——不许拿同一个数冒充三个口径。 */
+
+const GBK = (() => { try { return new TextDecoder('gbk'); } catch (e) { return null; } })();
+
+async function rawText(url, headers, ms = 8000) {
+  const r = await fetch(url, {
+    headers: Object.assign({ 'User-Agent': UA }, headers || {}),
+    signal: AbortSignal.timeout(ms),
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const buf = Buffer.from(await r.arrayBuffer());
+  const ct = r.headers.get('content-type') || '';
+  /* 腾讯/新浪这两个接口是 GBK 且不带 charset，直接按 UTF-8 解会得到乱码 */
+  if (GBK && !/utf-8/i.test(ct)) return GBK.decode(buf);
+  return buf.toString('utf8');
+}
+
+function symOf(secid) {
+  const m = /^([01])\.(\d{6})$/.exec(String(secid || ''));
+  return m ? (m[1] === '1' ? 'sh' : 'sz') + m[2] : null;
+}
+
+async function sinaSuggest(q) {
+  const t = await rawText('https://suggest3.sinajs.cn/suggest/type=11,12,15&key=' + encodeURIComponent(q),
+    { Referer: 'https://finance.sina.com.cn' });
+  const m = /"([^"]*)"/.exec(t);
+  if (!m || !m[1]) return [];
+  const out = [];
+  for (const seg of m[1].split(';')) {
+    const f = seg.split(',');
+    if (f.length < 5 || !/^\d{6}$/.test(f[2] || '')) continue;
+    const mk = /^sh/i.test(f[3]) ? '1' : /^sz/i.test(f[3]) ? '0' : '';
+    if (!mk) continue;                       /* 只做 A 股，港股美股不在这里兜底 */
+    out.push({ code: f[2], name: f[4] || f[0], secid: mk + '.' + f[2], cls: 'AStock',
+      market: mk === '1' ? '沪A' : '深A', mktNum: mk });
+  }
+  return out;
+}
+
+async function tencentQuotes(list) {
+  const pairs = list.map(it => [it, symOf(it.secid)]).filter(x => x[1]);
+  if (!pairs.length) return list.map(it => ({ ...it, ok: false, err: '行情接口没有这只' }));
+  const t = await rawText('https://qt.gtimg.cn/q=' + pairs.map(x => x[1]).join(','), { Referer: 'https://finance.qq.com' });
+  const by = {};
+  for (const line of t.split(';')) {
+    const m = /v_(\w+)="([^"]*)"/.exec(line);
+    if (!m) continue;
+    const f = m[2].split('~');
+    if (f.length > 46) by[m[1].slice(2)] = f;
+  }
+  const n = x => { const v = +x; return (x !== '' && isFinite(v)) ? v : null; };
+  return list.map(it => {
+    const f = by[it.code];
+    if (!f) return { ...it, ok: false, err: '行情接口没有这只' };
+    return {
+      ...it, ok: true, src: 'tencent',
+      name: f[1] || it.name,
+      price: n(f[3]), prev: n(f[4]),
+      chgPct: n(f[32]),                       /* 腾讯这个字段已经是百分数，不除 100 */
+      high: n(f[33]), low: n(f[34]),
+      mcap: n(f[45]) === null ? null : Math.round(n(f[45]) * 1e8),   /* 腾讯给的是亿元 */
+      pe: null, peTTM: n(f[39]), peStatic: null,
+      pb: n(f[46]),
+      cur: 'CNY',
+    };
+  });
+}
+
+async function sinaBand(it, days = 1200, lastPx = null) {
+  const sym = symOf(it.secid);
+  if (!sym) return null;
+  const t = await rawText('https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=' +
+    sym + '&scale=240&ma=no&datalen=' + days, { Referer: 'https://finance.sina.com.cn' });
+  const arr = JSON.parse(t);
+  const row = arr.filter(x => x && isFinite(+x.close) && +x.close > 0);
+  if (row.length < 12) return null;
+  const vals = row.map(x => +x.close);
+  /* 日线最后一条是上一个交易日。用今天现价顶掉它，分位才是「现在」的位置，
+     否则盘中涨了 1% 还按昨收算，读数会系统性偏一格。 */
+  const last = (lastPx != null && isFinite(lastPx) && lastPx > 0) ? +lastPx : vals[vals.length - 1];
+  let lo = 0, hi = 0;
+  vals.forEach((v, i) => { if (v < vals[lo]) lo = i; if (v > vals[hi]) hi = i; });
+  return {
+    label: '约 ' + Math.round(row.length / 240) + ' 年日线', n: row.length,
+    last, pct: vals.filter(x => x <= last).length / vals.length,
+    lo: vals[lo], loAt: row[lo].day.slice(0, 7),
+    hi: vals[hi], hiAt: row[hi].day.slice(0, 7),
+  };
 }
 
 function cached(key, ms, fn) {
@@ -80,6 +180,16 @@ async function suggest(q) {
   })).filter(r => r.secid && !/Bond|Fund|ETF|Option|Warrant/.test(r.Classify || ''));
 }
 
+/* 找代码：东财优先，云端回空就换新浪。
+   注意东财在云端不是报错，是回一段别的 JSONP——解析出来没有 Data 字段，
+   等于静默返回空数组，所以必须按「空」降级，不能只 catch 异常。 */
+async function resolveBy(q) {
+  let g = [];
+  try { g = await suggest(q); } catch (e) { g = []; }
+  if (!g.length) { try { g = await sinaSuggest(q); } catch (e) { g = []; } }
+  return g;
+}
+
 /* 返回候选数组。第一个是最可能的。 */
 async function resolve(q) {
   const s = String(q || '').trim();
@@ -89,7 +199,7 @@ async function resolve(q) {
 
   /* 直接给了 6 位代码 */
   if (CODE_RE.test(s)) {
-    const g = await suggest(s);
+    const g = await resolveBy(s);
     const exact = g.find(x => x.code === s);
     if (exact) return [exact].concat(g.filter(x => x !== exact).slice(0, 3));
     const pre = s[0] === '6' ? '1' : '0';
@@ -97,11 +207,11 @@ async function resolve(q) {
   }
   /* 直接给了美股代码 */
   if (US_RE.test(s) && s.length <= 5 && /^[A-Z]+$/.test(s)) {
-    const g = await suggest(s);
+    const g = await resolveBy(s);
     const exact = g.find(x => String(x.code).toUpperCase() === s);
     if (exact) return [exact].concat(g.filter(x => x !== exact).slice(0, 3));
   }
-  return (await suggest(s)).slice(0, 8);
+  return (await resolveBy(s)).slice(0, 8);
 }
 
 /* ---------- 行情 ---------- */
@@ -113,8 +223,16 @@ async function quotes(items) {
   const ids = list.map(x => x.secid).join(',');
   const url = 'https://push2.eastmoney.com/api/qt/ulist.np/get?secids=' + encodeURIComponent(ids) +
     '&fields=f2,f3,f12,f14,f15,f16,f18,f20,f9,f23,f114,f115';
-  const j = await httpJSON(url);
-  const diff = (j && j.data && j.data.diff) || [];
+  let diff = [];
+  try {
+    const j = await httpJSON(url);
+    diff = (j && j.data && j.data.diff) || [];
+  } catch (e) { diff = []; }
+  if (!diff.length) {
+    /* 云端对 push2 是直接断连（socket hang up），不是返回空 body */
+    try { return await tencentQuotes(list); }
+    catch (e) { return list.map(it => ({ ...it, ok: false, err: '行情没拿到：' + e.message })); }
+  }
   const byCode = new Map(diff.map(d => [String(d.f12), d]));
   return list.map(it => {
     const d = byCode.get(String(it.code));
@@ -139,7 +257,7 @@ async function quotes(items) {
 }
 
 /* 近 N 个月收盘价分位：回答「现在贵不贵」时，价格分位比 PE 更好拿也更直观 */
-async function priceBand(item, months = 60) {
+async function priceBand(item, months = 60, lastPx = null) {
   if (!item || !item.secid) return null;
   if (item.secid.startsWith('idx:')) return null;
   try {
@@ -148,17 +266,21 @@ async function priceBand(item, months = 60) {
     const j = await httpJSON(url);
     const ks = (j && j.data && j.data.klines) || [];
     const vals = ks.map(s => +(String(s).split(',')[1])).filter(x => isFinite(x) && x > 0);
-    if (vals.length < 12) return null;
-    const last = vals[vals.length - 1];
+    if (vals.length < 12) throw new Error('月线太少');
+    const last = (lastPx != null && isFinite(lastPx) && lastPx > 0) ? +lastPx : vals[vals.length - 1];
     const below = vals.filter(x => x <= last).length;
     return {
-      months: vals.length, last,
+      label: '近 ' + vals.length + ' 个月月线', n: vals.length, months: vals.length, last,
       pct: below / vals.length,
       hi: Math.max(...vals), lo: Math.min(...vals),
       hiAt: ks[vals.indexOf(Math.max(...vals))].split(',')[0],
       loAt: ks[vals.indexOf(Math.min(...vals))].split(',')[0],
     };
-  } catch (e) { return null; }
+  } catch (e) {
+    /* 云端 push2his 直接断连，改算新浪日线的分位 —— 口径从月线换成日线，
+       文案要跟着换，不能拿日线冒充「60 个月月线」。 */
+    try { return await sinaBand(item, 1200, lastPx); } catch (e2) { return null; }
+  }
 }
 
 /* ---------- 财务 ---------- */
@@ -299,7 +421,7 @@ async function snapshot(q, opt = {}) {
   if (!quote || !quote.ok) return { ok: false, err: (quote && quote.err) || '行情没拿到', at, cand: cands.slice(0, 4) };
 
   const fins = opt.financials === false ? [] : await financials(it);
-  const band = opt.band === false ? null : await priceBand(it, 60);
+  const band = opt.band === false ? null : await priceBand(it, 60, quote.price);
 
   const L = [];
   L.push(`标的：${quote.name}（${quote.code} · ${quote.market || it.market}）`);
@@ -316,7 +438,7 @@ async function snapshot(q, opt = {}) {
   }
   if (quote.pb !== null && quote.pb > 0) L.push(`  PB ${quote.pb.toFixed(2)} 倍`);
   if (band) {
-    L.push(`价格位置（近 ${band.months} 个月月线，共 ${band.months} 个收盘价）：`);
+    L.push(`价格位置（${band.label || ('近 ' + band.months + ' 个月月线')}，共 ${band.n || band.months} 个收盘价）：`);
     L.push(`  当前处在 ${(band.pct * 100).toFixed(0)}% 分位；区间 ${band.lo.toFixed(2)}（${band.loAt}）到 ${band.hi.toFixed(2)}（${band.hiAt}）`);
   }
   if (fins.length) L.push(finBlock(fins, quote.cur));
@@ -385,4 +507,6 @@ async function announcements(code, n = 5) {
   }));
 }
 
-module.exports = { resolve, snapshot, compare, quotes, financials, indexEva, indexEvaAll, priceBand, news, announcements, bigMoney, pctText };
+module.exports = { resolve, snapshot, compare, quotes, financials, indexEva, indexEvaAll, priceBand, news, announcements, bigMoney, pctText,
+  /* 备用源单独导出：云端的东财是断的，本地测不到那条路径，直接单测这三个 */
+  sinaSuggest, tencentQuotes, sinaBand };
