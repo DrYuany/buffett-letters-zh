@@ -58,6 +58,17 @@ function loadData() {
 }
 const { C, L, CT } = loadData();
 
+/* 与 build.py 的 block_text() / 前端 index.html 的 blockText() 完全一致：
+   表格块拼 head + rows，其余取 t */
+function blockText(b) {
+  if (b.k === 't') {
+    const parts = (b.head || []).slice();
+    for (const r of (b.rows || [])) parts.push(r.join(' '));
+    return parts.join(' ');
+  }
+  return b.t || '';
+}
+
 /* 分身模式的历史决策案例库。没生成 site/data-cases.js 时，考据模式照常能用。 */
 let SITUATION = null;
 try { SITUATION = require('./situation'); }
@@ -130,7 +141,7 @@ const DOCI = {};
 Object.keys(L).forEach(id => {
   const lt = L[id];
   lt.blocks.forEach((b, bi) => {
-    const t = (b.t || '').replace(/\s+/g, ' ').trim();
+    const t = blockText(b).replace(/\s+/g, ' ').trim();
     if (t.length < 24) return;
     DOCI[id + '|' + bi] = DOCS.length;
     DOCS.push({ l: id, y: lt.year, b: bi, k: b.k, t: t, p: b.k === 'p' ? 1 : 0 });
@@ -850,7 +861,7 @@ async function toolCall(name, args, asOf) {
         for (let i = bi + 1; i < lt.blocks.length && body.length < 3; i++) {
           const b2 = lt.blocks[i];
           if (b2.k === 'h' || b2.k === 'h2') break;
-          const t = (b2.t || '').trim();
+          const t = blockText(b2).trim();
           if (t.length < 8) continue;
           if (first < 0) first = i;
           body.push(`第 ${i} 段：${t.slice(0, 700)}`);
@@ -867,7 +878,7 @@ async function toolCall(name, args, asOf) {
       }
       const around = [];
       for (let i = Math.max(0, bi - 1); i <= Math.min(lt.blocks.length - 1, bi + 1); i++) {
-        around.push(`第 ${i} 段：${(lt.blocks[i].t || '').slice(0, 700)}`);
+        around.push(`第 ${i} 段：${blockText(lt.blocks[i]).slice(0, 700)}`);
       }
       return {
         text: `${lt.title || l}（${lt.year} 年）\n` + around.join('\n\n') + `\n\n引用标记：[[${l}|${bi}]]`,
