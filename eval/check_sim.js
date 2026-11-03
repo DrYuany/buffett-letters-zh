@@ -13,7 +13,7 @@
  *     node eval/check_sim.js <file> --verbose             逐条打全表（默认只打不合格项）
  *
  * 判据不是我定的，是 systemPrompt 里那五段的契约。改提示词就得改这里，两处必须对得上：
- *   【他确实说过】原话逐字 + 能点回出处；【现在的事实】每条带数字或报告期 + 来源标记；
+ *   【我确实说过】原话逐字 + 能点回出处；【现在的事实】每条带数字或报告期 + 来源标记；
  *   【我怎么量它】每个角度都有尺子 + 读数；【所以】一个明确立场；
  *   【我可能错在哪】一个能被人当面反驳的证伪点。
  *
@@ -131,7 +131,7 @@ function readRecords(file, runId, allModes, since) {
 }
 
 /* ---------------- 切段 ---------------- */
-const HEADS = ['他确实说过', '现在的事实', '我怎么量它', '所以', '我可能错在哪'];
+const HEADS = ['我确实说过', '现在的事实', '我怎么量它', '所以', '我可能错在哪'];
 const HALT = HEADS.join('|');
 
 function normHeads(t) {
@@ -253,7 +253,7 @@ function judgeOne(d) {
   rec('结构', '结尾有免责句', /不是我对今天这件事的承诺/.test(tail), tail.slice(-40).replace(/\n/g, ' '));
 
   /* --- 原话区 --- */
-  const qz = sec['他确实说过'] || '';
+  const qz = sec['我确实说过'] || '';
   const marks = [...qz.matchAll(MARK_RE)];
   let okMark = 0;
   marks.forEach(m => {
@@ -337,7 +337,7 @@ function judgeOne(d) {
   rec('判断', '证伪点可观察', falsify, (wrong.split('\n').pop() || '').slice(0, 40));
 
   /* --- 越界 --- */
-  const outside = S.pre + '\n' + HEADS.filter(h => h !== '他确实说过').map(h => sec[h] || '').join('\n');
+  const outside = S.pre + '\n' + HEADS.filter(h => h !== '我确实说过').map(h => sec[h] || '').join('\n');
   const outQuotes = [...outside.matchAll(QUOTE_RE)].map(m => m[1].trim());
   const stolen = [];
   outQuotes.forEach(q => {

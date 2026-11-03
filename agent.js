@@ -1825,13 +1825,35 @@ function triageMode(message, mode) {
   if (askPast) return 'archive';
   return (askNow || askView || askDecide) ? 'simulate' : 'archive';
 }
+/* 确定性四桶粗判：只有这些高置信模式才直接拍板，拿不准一律返回 null 交给分类器。
+   为什么要有这一层：实测「茅台流通市值是多少」两次分类一次 lookup 一次 judgment，
+   单次 flash 分类在「查数 vs 研判」这条边界上不稳。正则是确定的，先把这些无歧义的
+   模式锁死，LLM 只管剩下真正模棱两可的那部分 —— 既更稳，也省掉不必要的分类调用。 */
+function triageBucket(message) {
+  const msg = String(message || '');
+  /* chat：起名/来历/寒暄。这类问题永远不是研判、不是考据、不是查数。 */
+  if (/(为什么叫|为什么取|为何叫|为啥叫|名字(是)?(怎么|如何)(来|取|起)的|名字的由来|起名|命名|你是谁|你好|谢谢|再见|拜拜|吃了吗|今天天气)/.test(msg)) return 'chat';
+  /* quote：问「他」说过/写过/提过什么 —— 排在 lookup 前面，因为「提过几次」是考据不是查数。 */
+  if (/(他说过|他讲过|他提过|信里|原话|哪一年|哪封信|怎么说的|有没有提过|写过什么|提过几次|说过什么|说过哪些)/.test(msg)) return 'quote';
+  /* lookup：查一个具体数字或事实。只认「是多少 / 多少钱 / 哪年成立」这类无歧义问法，
+    不认光秃秃的「市值」（那可能是「市值合理吗」这种研判题）。 */
+  if (/(是多少|多少钱|多少亿|多少倍|流通市值|流通股本|总股本|市盈率是多少|PE是多少|PB是多少|出现过几次|提到过几次|提到几次|哪年成立|哪年上市|什么时候成立|什么时候上市|创始人是谁|董事长是谁|股东人数|股息率)/.test(msg)) return 'lookup';
+  /* judgment：今天这件事怎么看 / 该不该动。沿用 triageMode 的判据，补上「跌/涨」的口语信号。 */
+  const askNow = /(现在|目前|最近|今年|今天|当下|这会儿|该不该买|值不值|能不能买|能不能持有|贵不贵|便宜吗|跌了|涨了|为什么跌|为什么涨)/.test(msg);
+  const askView = /(你|您)怎么(看|想)|你会怎么做|换成你|如果是你/.test(msg);
+  const askDecide = /(该不该|值不值|划不划算|能不能(买|持有|追|上车)|还能(追|买)|追不追|要不要(买|卖|加|减|换)|(该|能|要)不该?(抄底|上车|割肉)|是不是比.{0,14}(划算|强|稳|好)|比.{0,10}(划算|强|稳))/.test(msg);
+  if (askNow || askView || askDecide) return 'judgment';
+  return null;
+}
 /* ---------------- 问题类型路由（四桶） ----------------
    身份（人设）和答题形态要分开：身份由前端按钮定，答题形态由这句话本身定。
    上面的 triageMode 正则只能认出「考据 vs 研判」，认不出「查一个数」「闲聊一句」——
    可会话里大量追问正是这两类（上一句问茅台怎么跌、下一句问「茅台为什么叫这个名字」）。
-   所以每次都由一次便宜的分类调用判定四桶之一；分类失败就退回正则的 archive/simulate。 */
+   所以：先 triageBucket 确定性判，判不准再由一次便宜的分类调用补；分类也失败就退回正则。 */
 const BUCKETS = ['judgment', 'lookup', 'quote', 'chat'];
 async function classifyBucket(message, wantMode, apiKey) {
+  const det = triageBucket(message);
+  if (det) return det;
   const sys = `你是对话路由器。判断读者这句话属于哪一类，只输出一个词：judgment / lookup / quote / chat。不要解释，不要标点。
 
 quote —— 问「他（巴菲特）说过/写过/提过什么」：翻信件、股东大会、演讲原文。信号：「他说过」「原话」「哪封信」「提过几次」。
@@ -2050,7 +2072,7 @@ function emitSSE(res, q, ip) {
       try {
         bucket = await classifyBucket(q.message, wantMode, apiKey);
       } catch (e) {
-        bucket = triageMode(q.message, wantMode) === 'simulate' ? 'judgment' : 'quote';
+        bucket = triageBucket(q.message) || (triageMode(q.message, wantMode) === 'simulate' ? 'judgment' : 'quote');
         console.log('  [分诊] 分类器失败（' + e.message + '），退回正则：' + bucket);
       }
       const bucketHint = wantMode === 'simulate' ? 'judgment' : 'quote';

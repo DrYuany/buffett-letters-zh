@@ -526,9 +526,10 @@ a.noyr{text-decoration:none;pointer-events:none}
 .tp-bar{position:sticky;bottom:0;background:var(--bg);z-index:5;padding-top:22px;margin-top:26px}
 .tp-composer{display:flex;gap:9px;align-items:center;padding:14px 0 10px;
   border-top:1px solid var(--border)}
-.tp-composer input{flex:1;min-width:0;border:1px solid var(--line2);border-radius:10px;padding:12px 14px;
-  font-size:14.5px;font-family:var(--sans);background:var(--panel);color:var(--text);outline:none}
-.tp-composer input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow)}
+.tp-composer input,.tp-composer textarea{flex:1;min-width:0;border:1px solid var(--line2);border-radius:10px;padding:12px 14px;
+  font-size:14.5px;font-family:var(--sans);background:var(--panel);color:var(--text);outline:none;
+  resize:none;line-height:1.5}
+.tp-composer input:focus,.tp-composer textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-glow)}
 .tp-send{background:var(--gold);color:#fff;border:0;border-radius:10px;padding:12px 22px;font-size:14px;
   font-weight:600;cursor:pointer;font-family:var(--sans);white-space:nowrap}
 .tp-send:hover{background:var(--gold-light);color:#20180A}
@@ -710,7 +711,7 @@ a.noyr{text-decoration:none;pointer-events:none}
   .tb-q{white-space:normal}
   .tp-topics{grid-template-columns:1fr}
   .tp-composer{flex-wrap:wrap}
-  .tp-composer input{flex:1 1 100%;order:-1}
+  .tp-composer input,.tp-composer textarea{flex:1 1 100%;order:-1}
   .msg .bubble{max-width:86%}
   .stat-num{font-size:21px}
   .stat-label{font-size:9.5px;letter-spacing:0}
@@ -2089,10 +2090,10 @@ function fmtAns(t, cmap){
   return out;
 }
 /* 分身答案按固定标题分段：原话单独一区（能点回原信），研判主体一区（明确标成模拟）。
-   模型写标题的花样不少——【他确实说过】、〔他确实说过〕、**〔他确实说过〕**，
+   模型写标题的花样不少——【我确实说过】、〔我确实说过〕、**〔我确实说过〕**，
    所以先把这几种写法归一，再按标题切段；一个标题都没认出来就原样显示。
    每条判断都要求带数字和可证伪点，这里只负责排版，不替它补内容。 */
-var SIM_HEADS = ['他确实说过', '现在的事实', '我怎么量它', '所以', '我可能错在哪', '按这些依据推演'];
+var SIM_HEADS = ['我确实说过', '现在的事实', '我怎么量它', '所以', '我可能错在哪', '按这些依据推演'];
 function fmtSim(t, cmap){
   /* 模型偶尔把两种标记叠着写：{{rule-20；[[1982 巴菲特致股东信|19]]}}。
      花括号不是这套语法的符号，原样输出就是一段乱码样的东西。
@@ -2104,7 +2105,7 @@ function fmtSim(t, cmap){
   });
   var alt = SIM_HEADS.join('|');
   var norm = s0.replace(new RegExp('\\*{0,2}[〔【]\\s*(' + alt + ')\\s*[〕】]\\*{0,2}', 'g'), '【$1】')
-    /* 有时它干脆不写括号，只把标题写成一行加粗：**他确实说过**。
+    /* 有时它干脆不写括号，只把标题写成一行加粗：**我确实说过**。
        这种也要认，否则整篇五段会挤成一大坨。 */
     .replace(new RegExp('^\\s*\\*\\*\\s*(' + alt + ')\\s*\\*\\*\\s*$', 'gm'), '【$1】');
   var re = new RegExp('【\\s*(' + alt + ')\\s*】', 'g');
@@ -2115,12 +2116,12 @@ function fmtSim(t, cmap){
   var quote = '', body = '';
   ms.forEach(function(x, i){
     var seg = norm.slice(x.end, i + 1 < ms.length ? ms[i + 1].at : norm.length).trim();
-    if (x.name === '他确实说过' && !quote) quote = seg;
+    if (x.name === '我确实说过' && !quote) quote = seg;
     else body += '<p class="tp-h">' + x.name + '</p>' + fmtAns(seg, cmap);
   });
   var out = pre ? fmtAns(pre, cmap) : '';
-  if (quote) out += '<div class="tp-zone"><div class="tp-zone-h">他确实说过 · 可点回原信</div>' + fmtAns(quote, cmap) + '</div>';
-  if (body) out += '<div class="tp-zone tp-zone-sim"><div class="tp-zone-h">按他的旧判断推演 · 模拟，不是他的原话</div>' + body + '</div>';
+  if (quote) out += '<div class="tp-zone"><div class="tp-zone-h">我确实说过 · 可点回原信</div>' + fmtAns(quote, cmap) + '</div>';
+  if (body) out += '<div class="tp-zone tp-zone-sim"><div class="tp-zone-h">按我过去的判断推演 · 模拟，非本人观点</div>' + body + '</div>';
   return out || fmtAns(norm, cmap);
 }
 function fmtBody(m){
@@ -2304,7 +2305,7 @@ function talkPage(){
       '</div>' +
       '<div class="tp-composer">' +
         '<button class="tp-new" id="talk-new">+ 新对话</button>' +
-        '<input id="talk-in" type="text" autocomplete="off" placeholder="请教巴菲特一个问题…" value="' + esc(TALK.draft) + '">' +
+        '<textarea id="talk-in" rows="1" autocomplete="off" placeholder="请教巴菲特一个问题…">' + esc(TALK.draft) + '</textarea>' +
         '<button class="tp-send" id="talk-send">提问</button>' +
       '</div>' +
       '<div class="tp-opts">' +
@@ -2611,8 +2612,18 @@ function render(){
 function bind(){
   var tin = document.getElementById('talk-in');
   if (tin){
-    tin.oninput = function(){ TALK.draft = tin.value; };
-    tin.onkeydown = function(ev){ if (ev.key === 'Enter'){ ev.preventDefault(); talkAsk(tin.value); } };
+    tin.oninput = function(){
+      TALK.draft = tin.value;
+      /* 多行时让输入框自动撑高 */
+      tin.style.height = 'auto';
+      tin.style.height = tin.scrollHeight + 'px';
+    };
+    tin.onkeydown = function(ev){
+      if (ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); talkAsk(tin.value); }
+    };
+    /* 恢复草稿时若带换行，一进来就按内容高度撑好 */
+    tin.style.height = 'auto';
+    tin.style.height = tin.scrollHeight + 'px';
     document.getElementById('talk-send').onclick = function(){ talkAsk(tin.value); };
     document.getElementById('talk-new').onclick = function(){
       TALK.msgs = []; TALK.draft = ''; TALK.evFact = ''; TALK.evGuess = '';
