@@ -74,6 +74,44 @@ def pick_sentence(p, keys, n=150):
     return p[:n]
 
 
+# ---------- 口语专用后置过滤（不动 CORR_PAT，CORR_PAT 仍与 extract_content.py 保持一致） ----------
+# CORR_PAT 的 lesson 类把「学费」当"付出代价"的隐喻, 但口语里大量出现字面「大学学费/学校学费/医学院学费…」。
+# 下面这些只用于口语语料(会议/演讲)命中 CORR_PAT 之后、写入结果之前, 把明显非认错的段丢掉。
+TUITION_LITERAL = (
+    '大学学费', '学校学费', '学院', '医学院', '商学院',          # 机构上下文（「学院」覆盖 商学院/医学院/法学院…）
+    '学费全免', '学费减免', '学费上涨', '学费下降', '学费是',   # 学费状态/变动/判断
+    '哈佛', '预付学费', '付不起学费', '付得起学费', '学生的学费',  # 具体校名/支付能力
+)
+TUITION_PREFIX = ('大学', '学校', '学院', '商学院', '医学院')
+
+
+def is_literal_tuition(s):
+    """判断句子里的「学费」是字面学费（如大学学费）而非"付出代价"的隐喻。
+    隐喻用法（付出了学费 / 昂贵的学费 / 交学费学到教训）不受影响。"""
+    if any(mk in s for mk in TUITION_LITERAL):
+        return True
+    for i in range(len(s)):
+        if s.startswith('学费', i):
+            pre = s[max(0, i - 3):i]
+            if any(pre.endswith(p) for p in TUITION_PREFIX):
+                return True
+    return False
+
+
+def drop_spoken(src, text, sn, trigger):
+    """口语命中 CORR_PAT 后的噪声丢弃。返回 True 表示该条不写入结果。"""
+    # 1) 字面「学费」：口语里「学费」常指大学学费, 不是"付学费=付出代价"的隐喻
+    if trigger == '学费' and is_literal_tuition(sn):
+        return True
+    # 2) 提问句：认错是"本人陈述自己错了", 不是"被问教训是什么"
+    if sn.rstrip().endswith('？') or sn.rstrip().endswith('?'):
+        return True
+    # 3) 第三方旁白：演讲语料里 who 标了 buffett 但整段是第三人称叙述(如央视专访的解说词)
+    if src == 'speech' and re.match(r'^\s*巴菲特', text):
+        return True
+    return False
+
+
 def scan(rows, src, ent_names):
     """扫描本人发言的段，按 CORR_PAT 顺序匹配，命中即取含触发词那句。"""
     out = []
@@ -97,6 +135,8 @@ def scan(rows, src, ent_names):
             m = re.search(pat, text)
             if m:
                 sn = pick_sentence(text, [m.group(0)], 150)
+                if drop_spoken(src, text, sn, m.group(0)):
+                    break
                 key = (src, y, sn[:40])
                 if key in seen:
                     break
