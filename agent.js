@@ -88,7 +88,6 @@ catch (e) { console.log('  （未找到演讲语料，先跑 python build_speech
 let MARKET = null;
 try { MARKET = require('./market'); }
 catch (e) { console.log('  （market.js 没加载：现价/财报类问题只能联网搜）'); }
-const { fetchText } = require('./net');
 const mmss = s => {
   s = Math.max(0, Math.round(+s || 0));
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
@@ -1610,58 +1609,6 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/api/memory') {
       if (req.method === 'DELETE') { await fsp.writeFile(MEM_FILE, JSON.stringify({ notes: [] }, null, 1), 'utf8'); return json(res, 200, { ok: true }); }
       return json(res, 200, await readMemory());
-    }
-    /* 临时诊断口：要站长的密钥才放行，把取数每一步的原始响应当场带回来。
-       公网出口和本机出口拿到的格式不一样，隔着网看不到原文没法修。查完删掉。 */
-    if (u.pathname === '/api/diag') {
-      const own = await serverKey();
-      if (!own || String(u.searchParams.get('key') || '') !== own) return json(res, 403, { ok: false, err: 'forbidden' });
-      const q = String(u.searchParams.get('q') || '贵州茅台').slice(0, 40);
-      const out = { ok: true, q, steps: [] };
-      const grab = async (label, url) => {
-        const t0 = Date.now();
-        const r = await fetchText(url, { timeout: 9000, headers: { Referer: 'https://quote.eastmoney.com/', Accept: 'application/json, text/plain, */*' } })
-          .catch(e => ({ status: 0, text: 'ERR ' + e.message }));
-        out.steps.push({ step: label, ms: Date.now() - t0, status: r.status, head: String(r.text || '').slice(0, 300) });
-        return r;
-      };
-      await grab('suggest', 'https://searchapi.eastmoney.com/api/suggest/get?input=' + encodeURIComponent(q) +
-        '&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=8');
-      await grab('push2', 'https://push2.eastmoney.com/api/qt/ulist.np/get?secids=1.600519&fields=f2,f3,f12,f14,f18,f20,f9,f23,f114,f115');
-      await grab('kline', 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.600519&fields1=f1,f2,f3&fields2=f51,f53&klt=103&fqt=1&end=20500101&lmt=5');
-      if (MARKET) {
-        try {
-          const list = await MARKET.resolve(q);
-          out.steps.push({ step: 'resolve', n: list.length, cands: list.slice(0, 3) });
-          if (list.length) {
-            const qs = await MARKET.quotes(list.slice(0, 1)).catch(e => ({ threw: e.message }));
-            out.steps.push({ step: 'quotes', res: qs });
-          }
-        } catch (e) { out.steps.push({ step: 'throw', message: e.message }); }
-      }
-      /* 云端出口把东财拦得五花八门：searchapi 回一段不相干的 JSONP，push2 直接断连。
-         这里逐个探备选源，谁通就用谁。 */
-      const PROBE = [
-        ['tencent-quote', 'https://qt.gtimg.cn/q=sh600519', 'https://finance.qq.com'],
-        ['sina-quote', 'https://hq.sinajs.cn/list=sh600519', 'https://finance.sina.com.cn'],
-        ['sina-suggest', 'https://suggest3.sinajs.cn/suggest/type=11,12,15&key=' + encodeURIComponent(q), 'https://finance.sina.com.cn'],
-        ['tencent-kline', 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh600519,month,,,60,qfq', 'https://finance.qq.com'],
-        ['em-delay', 'https://push2delay.eastmoney.com/api/qt/ulist.np/get?secids=1.600519&fields=f2,f3,f12,f14,f9,f23,f114,f115,f20', 'https://quote.eastmoney.com/'],
-        ['em-datacenter', 'https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_LICO_FN_CPD&columns=ALL&filter=(SECURITY_CODE%3D%22600519%22)&pageSize=3&sortColumns=REPORTDATE&sortTypes=-1', 'https://data.eastmoney.com/'],
-      ];
-      for (const [name, url, ref] of PROBE) {
-        const t0 = Date.now();
-        try {
-          const r = await fetch(url, { headers: { 'User-Agent': UA, Referer: ref }, signal: AbortSignal.timeout(8000) });
-          const buf = Buffer.from(await r.arrayBuffer());
-          let txt;
-          try { txt = new TextDecoder('gbk').decode(buf); } catch (e2) { txt = buf.toString('utf8'); }
-          out.steps.push({ step: 'probe:' + name, ms: Date.now() - t0, status: r.status, len: buf.length, head: txt.replace(/\s+/g, ' ').slice(0, 170) });
-        } catch (e) {
-          out.steps.push({ step: 'probe:' + name, ms: Date.now() - t0, status: 0, err: e.message });
-        }
-      }
-      return json(res, 200, out);
     }
     let p = decodeURIComponent(u.pathname === '/' ? '/index.html' : u.pathname);
     const full = path.normalize(path.join(SITE, p));
