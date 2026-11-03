@@ -38,7 +38,8 @@ function load() {
         if (r.text && r.text.length >= 8) buf.push(r.text);
         continue;
       }
-      if (r.who !== 'buffett' || !r.text || r.text.length < 20) continue;
+      /* 巴菲特和芒格都是"答话人"，都要保留并配到同一条提问 */
+      if ((r.who !== 'buffett' && r.who !== 'munger') || !r.text || r.text.length < 20) continue;
       if (buf.length) {
         lastAsk = pickAsk(buf);
         buf = [];
@@ -46,9 +47,10 @@ function load() {
       if (lastAsk) nAsk++;
       /* 同一个提问下他连着答几段时并成一段：转录常把开场寒暄单独切出来
          （「有趣的是你区分了爱尔兰的更多阳光」），它短、命中词少，
-         长度归一化后反而排在真正的回答前面。并到上一段就压住了。 */
+         长度归一化后反而排在真正的回答前面。并到上一段就压住了。
+         只合并同一说话人的短段，避免把芒格的短答拼进巴菲特的话里。 */
       const prev = all[all.length - 1];
-      if (prev && lastAsk && prev.ask === lastAsk && prev.r.text.length < 60) {
+      if (prev && lastAsk && prev.ask === lastAsk && prev.r.who === r.who && prev.r.text.length < 60) {
         prev.r = Object.assign({}, prev.r, { text: prev.r.text + ' ' + r.text });
         continue;
       }
@@ -57,7 +59,7 @@ function load() {
   }
   SEGS = all.map(({ r, ask }) => ({
     y: r.y, session: r.session, ch: r.ch, title: r.title || '',
-    ans: r.text, ask, src: 'meeting',
+    ans: r.text, ask, who: r.who, src: 'meeting',
   }));
   META = {
     segs: SEGS.length, chars: SEGS.reduce((s, x) => s + x.ans.length, 0),
