@@ -252,6 +252,59 @@ function scoreToolHit(c, trace) {
   return { n: want.length, ok: ok, rate: +(ok / want.length).toFixed(3), used: used };
 }
 
+/* ---------------- 跨桶：工具签名 + 循环预算（过程·工具 / 过程·循环） ----------------
+   四桶路由之后，每个桶「该调什么工具、该查几轮」是不同的契约。
+   工具签名判「调对没」，循环预算判「查够没/查多没」。都从 trace 的 spans 机械判，零成本。 */
+
+/* 桶判定：trace.bucket 是四桶路由落的；旧 trace 没有就用 mode 兜底 */
+function bucketOf(trace) {
+  if (trace.bucket) return trace.bucket;
+  return trace.mode === 'simulate' ? 'judgment' : 'quote';
+}
+
+const BUCKET_TOOLS = {
+  judgment: { must: ['market_snapshot', 'match_situation'] },   /* 研判必拿行情 + 尺子 */
+  lookup:    { good: ['market_snapshot', 'count_mentions', 'web_search', 'open_url'] },
+  quote:     { good: ['search_letters', 'talk_search', 'speech_search', 'concept_profile',
+                      'company_timeline', 'corrections', 'stance_timeline', 'letter_outline',
+                      'open_passage', 'count_mentions'] },
+  chat:      { zero: true },                                    /* 闲聊不查任何工具 */
+};
+
+function scoreToolSig(trace) {
+  const bucket = bucketOf(trace);
+  const used = (trace.spans || []).filter(s => s.type === 'tool').map(s => s.name);
+  const sig = BUCKET_TOOLS[bucket];
+  if (!sig) return { n: 0, ok: 0, rate: null, bucket };
+  if (sig.zero) return { n: 1, ok: used.length === 0 ? 1 : 0, rate: used.length === 0 ? 1 : 0, used, bucket };
+  const missMust = (sig.must || []).filter(t => used.indexOf(t) < 0);
+  const hitGood = (sig.good || []).filter(t => used.indexOf(t) >= 0);
+  const ok = sig.must ? missMust.length === 0 : hitGood.length > 0;
+  /* 错工具罚则：研判该用 market_snapshot 拿一手行情，却用 web_search 拿二手数字 */
+  const wrongTool = bucket === 'judgment' && used.indexOf('market_snapshot') < 0 && used.indexOf('web_search') >= 0;
+  return { n: 1, ok: ok && !wrongTool ? 1 : 0, rate: ok && !wrongTool ? 1 : 0,
+    missMust, hitGood, wrongTool, used, bucket };
+}
+
+const BUCKET_BUDGET = {
+  judgment: { maxRounds: 6, maxCalls: 16, minCalls: 4 },   /* 已知 8-13 次 */
+  lookup:    { maxRounds: 2, maxCalls: 3,  minCalls: 1 },
+  quote:     { maxRounds: 6, maxCalls: 10, minCalls: 1 },
+  chat:      { maxRounds: 1, maxCalls: 0,  minCalls: 0 },
+};
+
+function scoreLoopBudget(trace) {
+  const bucket = bucketOf(trace);
+  const b = BUCKET_BUDGET[bucket];
+  if (!b) return { n: 0, over: false, under: false, rate: null, bucket };
+  const rounds = trace.rounds || 0;
+  const calls = trace.calls != null ? trace.calls
+    : (trace.spans || []).filter(s => s.type === 'tool').length;
+  const over = rounds > b.maxRounds || calls > b.maxCalls;
+  const under = calls < b.minCalls;
+  return { n: 1, over, under, ok: !over && !under, rate: !over && !under ? 1 : 0, rounds, calls, bucket };
+}
+
 /* ---------------- C 层：金标检索体检（零 token） ---------------- */
 function scoreRetrieve() {
   const { searchDocs, L } = loadSearch();
@@ -450,7 +503,9 @@ async function judgeOne(c, trace, apiKey) {
       num_trace: scoreNumTrace(t),
       web_mark: scoreWebMark(t, cites),
       abstain: scoreAbstain(t),
-      tool_hit: scoreToolHit(c, t)
+      tool_hit: scoreToolHit(c, t),
+      tool_sig: scoreToolSig(t),
+      loop_budget: scoreLoopBudget(t)
     };
     out.items.push(item);
   }
@@ -526,6 +581,9 @@ const REJUDGE = arg('rejudge', '').split(',').filter(Boolean);
     num_trace_pure: { rate: rateOf(pure, 'num_trace'), n: pure.length },
     web_mark: { rate: rate('web_mark'), n: cnt('web_mark') },
     tool_hit: { rate: rate('tool_hit'), n: cnt('tool_hit') },
+    tool_sig: { rate: rate('tool_sig'), n: main.length },
+    loop_over: main.filter(i => i.scores && i.scores.loop_budget && i.scores.loop_budget.over).length,
+    loop_under: main.filter(i => i.scores && i.scores.loop_budget && i.scores.loop_budget.under).length,
     abstain: { n: main.filter(i => i.scores && i.scores.abstain && i.scores.abstain.abstained).length },
     ms_avg: main.length ? Math.round(main.reduce((a, b) => a + (b.ms || 0), 0) / main.length) : null,
     ttft_avg: main.length ? Math.round(main.reduce((a, b) => a + (b.ttft || 0), 0) / main.length) : null,
@@ -549,6 +607,8 @@ const REJUDGE = arg('rejudge', '').split(',').filter(Boolean);
   console.log('句级落地率 ' + pct(out.agg.grounding.rate));
   console.log('数字溯源率 ' + pct(out.agg.num_trace.rate) + '（' + out.agg.num_trace.n + ' 个数字）');
   console.log('工具命中率 ' + pct(out.agg.tool_hit.rate));
+  console.log('工具签名命中率 ' + pct(out.agg.tool_sig.rate) + '（按桶该调的工具调对没）');
+  console.log('循环预算：超预算 ' + out.agg.loop_over + ' 条 / 证据不足 ' + out.agg.loop_under + ' 条');
   if (out.agg.judge_avg !== null) console.log('judge 均分 ' + out.agg.judge_avg + ' · ≥4 分占比 ' + pct(out.agg.judge_ge4));
   console.log('判分结果 → ' + fp);
   console.log('下一步： node eval/report.js --run-id ' + runId);
