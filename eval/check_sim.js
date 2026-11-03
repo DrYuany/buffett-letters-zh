@@ -397,6 +397,32 @@ if (!recs.length) {
 }
 
 const results = recs.map(judgeOne);
+
+/* 反事实一致性：同 pair 的两问（如高位回购 vs 低位回购），尺子（案例 id / 信件段）应稳定，
+   结论可因事实不同而不同。判法：两问「我怎么量它」区引用的尺子有没有交集。 */
+const pairGroup = {};
+results.forEach(r => {
+  const m = SIM_CASES[r.qid] || {};
+  if (m.pair) (pairGroup[m.pair] = pairGroup[m.pair] || []).push(r);
+});
+const rulerOf = r => {
+  const ang = splitSections(r.answer).sec['我怎么量它'] || '';
+  const ids = (ang.match(/〔[^〕]{1,40}〕/g) || []).map(s => s.replace(/[〔〕]/g, ''));
+  const marks = ang.match(/\[\[[^\]|]+\|\d+\]\]/g) || [];
+  return { ids, marks };
+};
+Object.keys(pairGroup).sort().forEach(p => {
+  const rs = pairGroup[p];
+  if (rs.length < 2) return;
+  const r0 = rulerOf(rs[0]), r1 = rulerOf(rs[1]);
+  const overlap = r0.ids.some(x => r1.ids.indexOf(x) >= 0) || r0.marks.some(x => r1.marks.indexOf(x) >= 0);
+  console.log((overlap ? '✓' : '✗') + ' 反事实一致性 [' + p + '] ' + (overlap ? '尺子稳定' : '尺子换了'));
+  if (!overlap) {
+    console.log('    ' + rs[0].qid + ' 尺子: ' + (r0.ids.concat(r0.marks).join(' / ') || '无'));
+    console.log('    ' + rs[1].qid + ' 尺子: ' + (r1.ids.concat(r1.marks).join(' / ') || '无'));
+  }
+});
+
 const byCheck = {};
 results.forEach(r => r.checks.forEach(c => {
   const k = c.group + '·' + c.name;
