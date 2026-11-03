@@ -88,6 +88,7 @@ catch (e) { console.log('  （未找到演讲语料，先跑 python build_speech
 let MARKET = null;
 try { MARKET = require('./market'); }
 catch (e) { console.log('  （market.js 没加载：现价/财报类问题只能联网搜）'); }
+const { fetchText } = require('./net');
 const mmss = s => {
   s = Math.max(0, Math.round(+s || 0));
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
@@ -1609,6 +1610,36 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/api/memory') {
       if (req.method === 'DELETE') { await fsp.writeFile(MEM_FILE, JSON.stringify({ notes: [] }, null, 1), 'utf8'); return json(res, 200, { ok: true }); }
       return json(res, 200, await readMemory());
+    }
+    /* 临时诊断口：要站长的密钥才放行，把取数每一步的原始响应当场带回来。
+       公网出口和本机出口拿到的格式不一样，隔着网看不到原文没法修。查完删掉。 */
+    if (u.pathname === '/api/diag') {
+      const own = await serverKey();
+      if (!own || String(u.searchParams.get('key') || '') !== own) return json(res, 403, { ok: false, err: 'forbidden' });
+      const q = String(u.searchParams.get('q') || '贵州茅台').slice(0, 40);
+      const out = { ok: true, q, steps: [] };
+      const grab = async (label, url) => {
+        const t0 = Date.now();
+        const r = await fetchText(url, { timeout: 9000, headers: { Referer: 'https://quote.eastmoney.com/', Accept: 'application/json, text/plain, */*' } })
+          .catch(e => ({ status: 0, text: 'ERR ' + e.message }));
+        out.steps.push({ step: label, ms: Date.now() - t0, status: r.status, head: String(r.text || '').slice(0, 300) });
+        return r;
+      };
+      await grab('suggest', 'https://searchapi.eastmoney.com/api/suggest/get?input=' + encodeURIComponent(q) +
+        '&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&count=8');
+      await grab('push2', 'https://push2.eastmoney.com/api/qt/ulist.np/get?secids=1.600519&fields=f2,f3,f12,f14,f18,f20,f9,f23,f114,f115');
+      await grab('kline', 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.600519&fields1=f1,f2,f3&fields2=f51,f53&klt=103&fqt=1&end=20500101&lmt=5');
+      if (MARKET) {
+        try {
+          const list = await MARKET.resolve(q);
+          out.steps.push({ step: 'resolve', n: list.length, cands: list.slice(0, 3) });
+          if (list.length) {
+            const qs = await MARKET.quotes(list.slice(0, 1)).catch(e => ({ threw: e.message }));
+            out.steps.push({ step: 'quotes', res: qs });
+          }
+        } catch (e) { out.steps.push({ step: 'throw', message: e.message }); }
+      }
+      return json(res, 200, out);
     }
     let p = decodeURIComponent(u.pathname === '/' ? '/index.html' : u.pathname);
     const full = path.normalize(path.join(SITE, p));
