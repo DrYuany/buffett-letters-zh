@@ -128,6 +128,9 @@ async function askOnce(q, opts, qid, session) {
   /* 分身单独一批：五段的判据和考据模式完全两套，混在 all 里会让旧基线没法对比。
      要跑就明写 --set sim，判分用 eval/check_sim.js。 */
   if (SETS === 'sim') cases = cases.concat(loadCases('cases-sim.jsonl'));
+  /* lookup/chat：四桶路由之后的新桶，判分用 eval/check_bucket.js。 */
+  if (SETS === 'all' || SETS === 'lookup') cases = cases.concat(loadCases('cases-lookup.jsonl'));
+  if (SETS === 'all' || SETS === 'chat') cases = cases.concat(loadCases('cases-chat.jsonl'));
   if (ONLY.length) cases = cases.filter(c => ONLY.indexOf(c.id) >= 0);
   if (SKIP.length) cases = cases.filter(c => SKIP.indexOf(c.id) < 0);
   if (LIMIT) cases = cases.slice(0, LIMIT);
