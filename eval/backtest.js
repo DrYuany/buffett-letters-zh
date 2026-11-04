@@ -25,7 +25,8 @@ const ROOT = path.join(__dirname, '..');
 const KEY = fs.readFileSync(path.join(ROOT, '_agent.key'), 'utf8').trim();
 const API = 'https://api.deepseek.com/chat/completions';
 const RES = path.join(__dirname, 'results');
-const CACHE = path.join(ROOT, '_src', 'backtest.jsonl');
+/* 洗题缓存进版本控制（eval/ 不在 .gitignore），否则回测基线不可复现。_src/ 整体被忽略。 */
+const CACHE = path.join(ROOT, 'eval', 'cases-backtest.jsonl');
 const AGENT = process.env.AGENT_URL || 'http://127.0.0.1:8123';
 
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > 0 ? process.argv[i + 1] : d; };
