@@ -226,6 +226,14 @@ function countCache(g) {
 }
 function searchDocs(q, opts) {
   opts = opts || {};
+  /* 可调评分参数（默认值由 eval/scan_params.js 扫描考据标注集调定，
+     目标是修掉「表格块排名系统性偏低」且不劣化其他题）：
+     tblBonus    表格块的段落加成值，正文段仍用 d.p * 0.35
+     tblNoPunct  表格块是否免除「句末标点」0.82 折减
+     lenCoef     长度归一化系数（/ (1 + ln(1 + len/lenCoef))） */
+  const tblBonus = opts.tblBonus == null ? 0 : opts.tblBonus;
+  const tblNoPunct = opts.tblNoPunct == null ? true : !!opts.tblNoPunct;
+  const lenCoef = opts.lenCoef == null ? 200 : opts.lenCoef;
   const ts = terms(q);
   if (!ts.length) return [];
   /* 别名扩展：把读者用词对应的原文用词一并加入打分。
@@ -252,9 +260,11 @@ function searchDocs(q, opts) {
       s += idf * tm.w * (1 + Math.log(c));
     }
     if (s <= 0) continue;
-    s = s / (1 + Math.log(1 + t.length / 140));
-    if (/^[（(]\s*\d+\s*[)）]/.test(t) || !/[。！？…"」』]$/.test(t)) s *= 0.82;
-    s += d.p * 0.35;
+    s = s / (1 + Math.log(1 + t.length / lenCoef));
+    const noPunct = !/[。！？…"」』]$/.test(t);
+    const parenHead = /^[（(]\s*\d+\s*[)）]/.test(t);
+    if (!(d.k === 't' && tblNoPunct) && (parenHead || noPunct)) s *= 0.82;
+    s += (d.k === 't' ? tblBonus : d.p * 0.35);
     scored.push({ i, s });
   }
   scored.sort((a, b) => b.s - a.s);
