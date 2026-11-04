@@ -287,9 +287,9 @@ function scoreToolSig(trace) {
 }
 
 const BUCKET_BUDGET = {
-  judgment: { maxRounds: 6, maxCalls: 16, minCalls: 4 },   /* 已知 8-13 次 */
-  lookup:    { maxRounds: 2, maxCalls: 3,  minCalls: 1 },
-  quote:     { maxRounds: 6, maxCalls: 10, minCalls: 1 },
+  judgment: { maxRounds: 6, maxCalls: 14, minCalls: 3 },   /* 实测 4-13 次 */
+  lookup:    { maxRounds: 7, maxCalls: 14, minCalls: 0 },   /* web_search 可重，0 工具=记忆回答（另有出处检查） */
+  quote:     { maxRounds: 7, maxCalls: 14, minCalls: 1 },   /* 实测 1-14 次 */
   chat:      { maxRounds: 1, maxCalls: 0,  minCalls: 0 },
 };
 

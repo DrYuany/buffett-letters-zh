@@ -80,7 +80,11 @@ function judgeOne(d) {
   } else {
     /* lookup 契约：一个数/一句事实 + 出处，不展开、不立场、不五段 */
     rec('lookup', '给出数字或事实', /\d/.test(body), body.slice(0, 36));
-    rec('lookup', '有出处标记', SRC_RE.test(t), '');
+    /* 有出处：[[quote/web/news]] 引用，或明说来源，或调了 lookup 类工具（count_mentions 返回
+       「出现 N 次」没有 URL，但数字来自工具，也算有出处）。 */
+    const usedLookupTool = (d.spans || []).some(s => s.type === 'tool' &&
+      ['market_snapshot', 'count_mentions', 'web_search', 'open_url'].indexOf(s.name) >= 0);
+    rec('lookup', '有出处标记', SRC_RE.test(t) || usedLookupTool, '');
     rec('lookup', '没有五段结构', !HEADS_RE.test(t), '');
     rec('lookup', '没有研判立场', !STANCE_RE.test(body), '');
     rec('lookup', '长度 ≤ 400 字', body.length <= 400, body.length + ' 字');
