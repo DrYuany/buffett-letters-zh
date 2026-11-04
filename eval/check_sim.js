@@ -119,12 +119,13 @@ function readRecords(file, runId, allModes, since) {
       } catch (e) {}
     }
   }
-  /* 只判分身答案。同一份 trace 里混着考据模式和研判模式的记录，
-     拿五段契约去考核据答案会得到一堆「一个标题都没认出来」的假失败。 */
+  /* 只判分身（研判）答案。统一模式后 trace 的 mode 记 'unified'，不再是 'simulate'；
+     拿五段契约去考核据/查数/闲聊答案会得到一堆「一个标题都没认出来」的假失败——
+     所以这里按 mode 粗筛，再在 judgeOne 里按「有没有五段标题」二次把关。 */
   const onlySim = !allModes;
   return out.filter(d => {
     if (runId && d.run_id !== runId) return false;
-    if (onlySim && d.mode !== 'simulate') return false;
+    if (onlySim && d.mode !== 'simulate' && d.mode !== 'unified') return false;
     if (since && String(d.time || '') < since) return false;
     return String(d.answer || '').length > 0;
   });
@@ -242,6 +243,12 @@ function judgeOne(d) {
 
   const S = splitSections(t);
   const sec = S.sec;
+
+  /* 统一模式后，trace 里可能混着非研判答案（查数/闲聊/考据）。
+     那些答案没有五段标题，不该拿研判契约去量——认不出标题就跳过，不判不合格。 */
+  if (!S.heads.length) {
+    return { checks, len: t.length, heads: [], answer: t, qid: d.qid || '', run: d.run_id || '', nonjudgment: true };
+  }
 
   /* --- 结构 --- */
   const all = HEADS.every(h => h in sec);
