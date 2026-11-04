@@ -136,6 +136,8 @@ function verdict(v, red) {
   L.push('');
   L.push('辅助指标（未设红线，用来定位问题）：句级落地率 ' + pct(a.grounding && a.grounding.rate) +
     '　·　工具命中率 ' + pct(a.tool_hit && a.tool_hit.rate) +
+    '　·　工具签名命中率（按桶） ' + pct(a.tool_sig && a.tool_sig.rate) +
+    '　·　循环超预算 ' + dash(a.loop_over) + ' 条 / 证据不足 ' + dash(a.loop_under) + ' 条' +
     '　·　judge 均分 ' + dash(a.judge_avg));
   L.push('');
 
