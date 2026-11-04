@@ -1919,8 +1919,18 @@ function rules(){
    连同年份和段落号贴回来，每条都能点回原信。
    这个体量（130 万字、8 千段）不需要向量库：字面检索就够快，
    也没有 embedding 的构建、存储和调用成本；真接大模型时再把这里的 top-k 当上下文即可。 */
-var TALK = { msgs: [], draft: '', evFact: '', lastEnt: '', lastQ: '', asked: '', busy: false, seen: {},
-  session: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) };
+var TALK = { msgs: [], draft: '', evFact: '', lastEnt: '', lastQ: '', asked: '', busy: false, seen: {}, session: '' };
+/* 会话号持久化：刷新页面、切走再切回对话页，都能续上同一段多轮对话（服务端按它记上下文）。
+   只有点「新对话」才换新号。存 localStorage，跟访客号 BUFFETT_VID 同一个套路。 */
+try {
+  TALK.session = localStorage.getItem('BUFFETT_SESSION') || '';
+  if (!TALK.session) {
+    TALK.session = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    localStorage.setItem('BUFFETT_SESSION', TALK.session);
+  }
+} catch (e) {
+  TALK.session = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
 
 /* 线描茶杯：不依赖 emoji 字体，深浅背景下都能看清 */
 function cupSVG(size){
@@ -2784,6 +2794,7 @@ function bind(){
       TALK.lastEnt = ''; TALK.lastQ = ''; TALK.asked = ''; TALK.seen = {};
       /* 换会话 = 换一段新的上下文，但长期记忆是跨会话的，不清 */
       TALK.session = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      try { localStorage.setItem('BUFFETT_SESSION', TALK.session); } catch (e) {}
       render();
     };
     document.querySelectorAll('.tp-topic').forEach(function(el){
