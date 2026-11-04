@@ -109,6 +109,33 @@ AUTO_ENTS = [
     {'kind': 'companies', 'name': '谷歌', 'en': 'Google', 'summary': '科技公司，讨论科技股时提及。'},
     {'kind': 'companies', 'name': '脸书', 'en': 'Facebook', 'summary': '科技公司，讨论科技股时提及。'},
     {'kind': 'companies', 'name': '阿勒格尼公司', 'en': 'Alleghany', 'summary': '保险控股公司，2022 年伯克希尔以约 110 亿美元收购。'},
+    # 第二轮实体补充（2026-11）：英文候选里的明确公司/机构
+    {'kind': 'companies', 'name': 'TTI', 'en': 'TTI', 'summary': '电子元器件分销商，2007 年伯克希尔收购，股东会上多次提及。'},
+    {'kind': 'companies', 'name': 'Phillips 66', 'en': 'Phillips 66', 'summary': '炼油与加油站公司，2012 年从康菲石油分拆，会上作为加油站品牌被提及。'},
+    {'kind': 'companies', 'name': 'Dr Pepper', 'en': 'Dr Pepper', 'summary': '软饮料公司，会上讨论软饮市场份额时提及。'},
+    {'kind': 'companies', 'name': 'Value Line', 'en': 'Value Line', 'summary': '投资研究出版物，巴菲特与芒格各订一份。'},
+    {'kind': 'companies', 'name': 'ESPN', 'en': 'ESPN', 'summary': '体育电视网络，会上讨论迪士尼对它的经营时提及。'},
+    {'kind': 'companies', 'name': 'Unicover', 'en': 'Unicover', 'summary': '1999 年爆雷的再保险安排，会上讨论再保险损失分配时提及。'},
+    {'kind': 'companies', 'name': 'Pinkerton', 'en': 'Pinkerton', 'summary': '安保公司，巴菲特早年曾任其董事。'},
+    {'kind': 'companies', 'name': 'Cities Service', 'en': 'Cities Service', 'summary': '石油公司（后并入 CITGO），巴菲特 11 岁买的第一只股票。'},
+    {'kind': 'companies', 'name': 'UPS', 'en': 'UPS', 'summary': '包裹快递公司，会上提及。'},
+    {'kind': 'companies', 'name': '万事达', 'en': 'Mastercard', 'summary': '支付网络，会上与 Visa 对比时提及。'},
+    {'kind': 'companies', 'name': 'Hochschild Kohn', 'en': 'Hochschild Kohn', 'summary': '巴尔的摩百货公司，巴菲特 1966 年收购的早期投资。'},
+    # 第二轮实体补充（2026-11）：无尾缀中文公司名
+    {'kind': 'companies', 'name': '微软', 'en': 'Microsoft', 'summary': '软件巨头，会上多次作为科技股范例被讨论。'},
+    {'kind': 'companies', 'name': '亚马逊', 'en': 'Amazon', 'summary': '电商与云计算公司，巴菲特买过其债券却错过其股票。'},
+    {'kind': 'companies', 'name': '麦当劳', 'en': "McDonald's", 'summary': '快餐连锁，会上多次作为优秀生意范例被讨论。'},
+    {'kind': 'companies', 'name': '摩根大通', 'en': 'JPMorgan', 'summary': '美国大银行，会上讨论银行衍生品时提及。'},
+    {'kind': 'companies', 'name': '英特尔', 'en': 'Intel', 'summary': '半导体公司，会上讨论科技公司与管理层时提及。'},
+    {'kind': 'companies', 'name': '瑞士再保险', 'en': 'Swiss Re', 'summary': '再保险巨头，伯克希尔曾与其达成再保险交易。'},
+    {'kind': 'companies', 'name': '埃克森美孚', 'en': 'ExxonMobil', 'summary': '石油巨头，会上讨论石油产量时提及。'},
+    {'kind': 'companies', 'name': '健力士', 'en': 'Guinness', 'summary': '啤酒与烈酒公司，会上讨论其持有 LVMH 股权时提及。'},
+    {'kind': 'companies', 'name': '贝尔斯登', 'en': 'Bear Stearns', 'summary': '投行，金融危机期间倒闭，会上讨论救助时提及。'},
+    {'kind': 'companies', 'name': '动视暴雪', 'en': 'Activision Blizzard', 'summary': '游戏公司，伯克希尔曾做其被微软收购的套利。'},
+    {'kind': 'companies', 'name': '吉百利', 'en': 'Cadbury', 'summary': '糖果公司，会上讨论卡夫收购它时提及。'},
+    {'kind': 'companies', 'name': '雅虎', 'en': 'Yahoo', 'summary': '互联网门户公司，会上讨论科技股时提及。'},
+    {'kind': 'companies', 'name': '耐克', 'en': 'Nike', 'summary': '运动品牌公司，会上讨论品牌时提及。'},
+    {'kind': 'companies', 'name': '慕尼黑再保险', 'en': 'Munich Re', 'summary': '再保险巨头，会上与瑞士再保险一同作为承保能力对比提及。'},
 ]
 companies += [dict(e, auto=True) for e in AUTO_ENTS if e['kind'] == 'companies']
 concepts  += [dict(e, auto=True) for e in AUTO_ENTS if e['kind'] == 'concepts']
@@ -142,6 +169,15 @@ ALIAS = {
     '菲利普·费雪': ['费雪'], '彼得·林奇': ['林奇'], '沃尔特·施洛斯': ['施洛斯'],
     # 会议/演讲实体发现时暴露的别名缺口（同一实体在不同语料里的叫法）:
     '马蒙集团': ['美联集团', 'Marmon'], '国民保险公司': ['国民赔偿公司', 'National Indemnity'],
+    # 第二轮实体补充时暴露的别名缺口:
+    '花旗集团': ['花旗', '花旗银行'],           # 花旗/Citibank 并入花旗集团
+    '全美航空': ['US Airways'],                 # USAir 1997 年改名
+    'Phillips 66': ['Phillips'],
+    'Dr Pepper': ['Dr. Pepper'],
+    'Cities Service': ['City Service'],
+    '万事达': ['Master Charge'],
+    'Hochschild Kohn': ['Hochschild-Kohn'],
+    '埃克森美孚': ['埃克森'],
 }
 
 def surfaces(e):
