@@ -2310,7 +2310,8 @@ function fmtSim(t, cmap){
 }
 function fmtBody(m){
   var cmap = citeMap(m && m.cites);
-  return (m && m.sim) ? fmtSim(m.raw || '', cmap) : fmtAns((m && m.raw) || '', cmap);
+  /* 统一模式：一律走 fmtSim——它认得出五段标题就按五段排版，认不出就退回普通排版。 */
+  return fmtSim((m && m.raw) || '', cmap);
 }
 
 /* 花了多少、查了几轮，摆在答案底下：接的是要花钱的模型，读者有权知道 */
@@ -2439,30 +2440,10 @@ function talkUpdateState(){
   if (hp) hp.innerHTML = talkHeroP();
 }
 
-/* 分身模式的页眉文案：常驻标明是模拟，不假装是本人观点 */
+/* 统一模式：不再分「查原话/问分身」两个 tab，一个化身既懂他过去的信、也能拿今天的事判断。
+   页眉常驻标明是模拟，不假装是本人观点。 */
 function talkSubText(){
-  return TM.modeAsk === 'simulate'
-    ? '巴菲特虚拟化身 · 模拟推演，非本人观点 · 不构成任何投资建议'
-    : '拉把椅子，听老先生慢慢讲投资与人生 · 关于他本人说过什么，只回答查得到出处的部分';
-}
-function talkEventHint(){
-  return TM.modeAsk === 'simulate'
-    ? '<b>分身模式</b> · 先写清楚今天发生了什么，再在下面问他怎么看（不问就默认「你会怎么想？」）'
-    : '这栏只在「问分身」模式下使用 · 当前是「查原话」模式';
-}
-/* 切模式绝不整页 render：审计脚本会真点每个按钮，重绘会把正在点的元素换成 0×0 的幽灵。
-   只改类名、提示文字和 placeholder。 */
-function talkSetMode(m){
-  TM.modeAsk = (m === 'simulate') ? 'simulate' : 'archive';
-  var a = document.getElementById('talk-mode-arc'), s = document.getElementById('talk-mode-sim');
-  if (a) a.className = 'tp-mode-btn' + (TM.modeAsk === 'archive' ? ' on' : '');
-  if (s) s.className = 'tp-mode-btn' + (TM.modeAsk === 'simulate' ? ' on' : '');
-  var sub = document.getElementById('tp-sub'); if (sub) sub.textContent = talkSubText();
-  var eh = document.getElementById('talk-event-h'); if (eh) eh.innerHTML = talkEventHint();
-  var ev = document.getElementById('talk-event');
-  if (ev) ev.className = 'tp-event' + (TM.modeAsk === 'simulate' ? '' : ' off');
-  var ti = document.getElementById('talk-in');
-  if (ti) ti.placeholder = TM.modeAsk === 'simulate' ? '想问分身什么？例如：你会怎么想？' : '请教巴菲特一个问题…';
+  return '巴菲特虚拟化身 · 可以翻他 98 封信的原话，也可以拿今天 A 股的事问判断 · 模拟推演，非本人观点，不构成任何投资建议';
 }
 
 function talkPage(){
@@ -2482,20 +2463,12 @@ function talkPage(){
     /* 输入框和它下面那排开关要一起粘在底部：单独粘输入框的话，
        长答案滚到一半时开关就被挤出视口，等于没有。 */
     '<div class="tp-bar">' +
-      '<div class="tp-event' + (TM.modeAsk === 'simulate' ? '' : ' off') + '" id="talk-event">' +
-        '<div class="tp-event-h" id="talk-event-h">' + talkEventHint() + '</div>' +
-        '<input id="talk-fact" type="text" autocomplete="off" placeholder="发生的事实：例如某白酒龙头三季度业绩低于预期，今天跌停" value="' + esc(TALK.evFact) + '">' +
-      '</div>' +
       '<div class="tp-composer">' +
         '<button class="tp-new" id="talk-new">+ 新对话</button>' +
         '<textarea id="talk-in" rows="1" autocomplete="off" placeholder="请教巴菲特一个问题…">' + esc(TALK.draft) + '</textarea>' +
         '<button class="tp-send" id="talk-send">提问</button>' +
       '</div>' +
       '<div class="tp-opts">' +
-        '<span class="tp-modes">' +
-          '<button class="tp-mode-btn' + (TM.modeAsk === 'archive' ? ' on' : '') + '" id="talk-mode-arc">查原话</button>' +
-          '<button class="tp-mode-btn' + (TM.modeAsk === 'simulate' ? ' on' : '') + '" id="talk-mode-sim">问分身</button>' +
-        '</span>' +
         '<label><input type="checkbox" id="talk-web"' + (TM.web ? ' checked' : '') + '> 允许联网核实（信件之外的事才用）</label>' +
         '<label><input type="checkbox" id="talk-pro"' + (TM.model === 'pro' ? ' checked' : '') + '> 深思模式（更慢、更细）</label>' +
         (showKey ? '<button class="tp-keybtn" id="talk-keybtn">' + (TKEY ? '已填密钥 · 更换' : '填我的 DeepSeek 密钥') + '</button>' : '') +
@@ -2525,19 +2498,12 @@ function talkPage(){
    联不上就退回页面内的关键词检索，并且在界面上明说是离线模式 —— 不装。 */
 function talkAsk(q){
   q = String(q || '').trim();
-  var sim = (TM.modeAsk === 'simulate');
-  var fact = (((document.getElementById('talk-fact') || {}).value) || TALK.evFact || '').trim();
-  if ((!q && !(sim && fact)) || TALK.busy) return;
-  /* 分身模式：事实由读者亲手给，不许模型自己补；想问什么统一走下面的大输入框 */
+  if (!q || TALK.busy) return;
   var qFull = q;
-  if (sim){
-    qFull = (fact ? '【今天发生的事实】' + fact : '（读者没有填写今天的事实）') +
-      '\n【我想问的】' + (q || '你会怎么想？');
-  }
   TALK.busy = true;
   TALK.draft = '';
   TALK.msgs.push({ r: 'u', t: qFull });
-  TALK.msgs.push({ r: 'b', raw: '', steps: [], sources: [], live: true, sim: sim });
+  TALK.msgs.push({ r: 'b', raw: '', steps: [], sources: [], live: true });
   var idx = TALK.msgs.length - 1;
   render();
   talkScroll();
@@ -2577,8 +2543,7 @@ function talkLocalFallback(q, idx){
     var a;
     try { a = talkAnswer(q); }
     catch (e) { a = '<p>检索时出了点问题：' + esc(e && e.message ? e.message : '未知错误') + '</p>'; }
-    if (TM.modeAsk === 'simulate') a = '<p><b>分身推演需要本地 Agent 服务，现在没连上。</b>' +
-      '这一问只按字面检索原文，不做任何推演：</p>' + a;
+    a = '<p><b>本地 Agent 服务现在没连上。</b>这一问只按字面检索原文，不做任何推演：</p>' + a;
     TALK.msgs[idx] = { r: 'b', h: a };
     var e2 = talkEnts(q)[0];
     if (e2) TALK.lastEnt = e2.n;
@@ -2629,7 +2594,7 @@ function talkStream(q, idx){
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: q, session: TALK.session, web: TM.web, model: TM.model,
-      mode: TM.modeAsk, vid: TVID, key: TKEY }),
+      vid: TVID, key: TKEY }),
     signal: TM.ctrl ? TM.ctrl.signal : undefined
   }).then(function(res){
     if (!res.ok) throw new Error('本地服务返回 ' + res.status);
@@ -2658,9 +2623,7 @@ function talkStream(q, idx){
     TALK.msgs[idx] = { r: 'b', h: '<p>连不上本地 Agent 服务了（' + esc(e && e.message ? e.message : '未知原因') + '）。' +
       '这一问先按关键词检索作答：</p>' };
     try {
-      TALK.msgs[idx].h = (TM.modeAsk === 'simulate'
-        ? '<p><b>分身推演需要本地 Agent 服务，现在没连上。</b>这一问只按字面检索原文，不做任何推演：</p>'
-        : '<p>连不上本地 Agent 服务。这一问先按关键词检索作答：</p>') + talkAnswer(q);
+      TALK.msgs[idx].h = '<p><b>本地 Agent 服务现在没连上。</b>这一问只按字面检索原文，不做任何推演：</p>' + talkAnswer(q);
     } catch (e2) { TALK.msgs[idx].h += '<p>（本地检索也失败了）</p>'; }
     talkFinish(idx, null);
   });
@@ -2826,12 +2789,6 @@ function bind(){
     document.querySelectorAll('.tp-topic').forEach(function(el){
       el.onclick = function(){ talkAsk(el.dataset.q); };
     });
-    var ma = document.getElementById('talk-mode-arc');
-    if (ma) ma.onclick = function(){ talkSetMode('archive'); };
-    var ms = document.getElementById('talk-mode-sim');
-    if (ms) ms.onclick = function(){ talkSetMode('simulate'); };
-    var ef = document.getElementById('talk-fact');
-    if (ef) ef.oninput = function(){ TALK.evFact = ef.value; };
     var tw = document.getElementById('talk-web');
     if (tw) tw.onchange = function(){ TM.web = !!tw.checked; };
     var tp = document.getElementById('talk-pro');
