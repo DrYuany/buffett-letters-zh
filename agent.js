@@ -1288,10 +1288,9 @@ async function toolCall(name, args, asOf) {
 }
 
 /* ---------------- 系统提示词 ----------------
-   opts 四个开关，都是评测与产品共用的一套东西：
+   opts 三个开关，都是评测与产品共用的一套东西：
      asOf     回到某一年（回测用；也给读者「就当今天是 1998 年」这种问法）
      anon     把名字抹掉（匿名化评测：看它到底是在扮演，还是在蹭"我记得巴菲特"）
-     mindset  已经先想过一轮的结论（先想后说，见 buildMindset）
      stances  这轮谈话里它已经表过的态（防长对话自我矛盾） */
 function systemPrompt(memNotes, mode, opts) {
   opts = opts || {};
@@ -1302,9 +1301,6 @@ function systemPrompt(memNotes, mode, opts) {
   const stance = (opts.stances || []).slice(-6).map(n => '- ' + n.text).join('\n');
   const stanceBlock = stance
     ? `\n【这轮谈话里你已经表过的态】\n${stance}\n（除非他现在给了新证据，否则不要改口；要改就明说"我刚说的那条我收回，因为……"）\n`
-    : '';
-  const mindBlock = opts.mindset
-    ? `\n【你开口之前已经想清楚的】\n${opts.mindset}\n（这段是你脑子里的推演，读者看不到。不要复述它，不要说"我上面想到"，直接开口。）\n`
     : '';
   const cutoff = opts.asOf
     ? `\n【时间闸门】今天是 ${today}，你只知道这一天之前发生的事。之后的任何事你都不知道——包括后来买了什么、后来股价怎么走、谁去世了。被问到就说"这我还没法知道"。`
@@ -1362,57 +1358,8 @@ ${voiceBlock(opts.noVoice)}
 ${BOUNDS}
 ${work}
 ${reader}
-${stanceBlock}${mindBlock}`;
+${stanceBlock}`;
 }
-
-/* ---------------- 先想后说 ----------------
-   一次非流式短调用，专门产出"开口之前的内部推演"。三个约束：
-     1. 它看不到读者，读者也看不到它 —— 所以可以写得粗糙、可以自我怀疑；
-     2. 必须落到六问上，否则模型会写成一段正确的废话；
-     3. 允许写"我不知道"，这一栏反而是最像他的地方。
-   这一步和主回答分开调用的理由:混在一轮里，模型会把推演直接说出来，而且会为了
-   让推演好看而扭曲判断。分开调，主回答只拿结论，不拿过程。 */
-const MINDSET_Q = [
-  '这件事落在我的能力圈里吗？如果不在，我该承认到什么程度？',
-  '要判断这件事，我需要哪几个具体数字？现在我知道哪些，缺哪些？缺的该去哪儿拿？',
-  '护城河有没有真的被改变，还是只是价格在动？',
-  '管理层和资本配置这一层，有没有出现我无法信任的迹象？',
-  '价格相对内在价值在什么位置？我有没有在用"便宜"掩盖"看不懂"？',
-  '我历史上最像的三次是哪三次？（给案例 id）那次我错在哪？',
-  '这一次我最容易犯的错是什么？我会不会在替自己想买的理由找证据？',
-];
-
-async function buildMindset(o) {
-  const { question, apiKey, model, asOf, anon } = o;
-  const NAME = anon ? '一位美国投资家' : '沃伦·巴菲特';
-  const sys = `你在扮演${NAME}。读者刚把一件事摆在你面前，你还没开口。
-先用你自己的方式把这件事想清楚，写成给自已看的笔记。
-
-要求：
-- 六问逐条回答，每条 1-2 句，可以写"不知道""看不出来"。
-- 不许写套话（"需要综合考虑""要辩证地看"），不许写给人看的客套。
-- 涉及历史判断时，尽量给出你记得的年份或案例名；记不清就说记不清。
-- 总长 300-450 字。只输出笔记正文，不要标题，不要开场白。`;
-  const usr = `今天：${asOf || nowStamp().slice(0, 10)}\n读者说的事：${question}\n\n六问：\n` +
-    MINDSET_Q.map((q, i) => (i + 1) + '. ' + q).join('\n');
-  try {
-    const r = await fetch(DEEPSEEK, {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model, messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }],
-        temperature: 0.5, max_tokens: 900, stream: false,
-      }),
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
-    const t = (j.choices && j.choices[0] && j.choices[0].message.content || '').trim();
-    return t || null;
-  } catch (e) {
-    return null;   /* 想不出来也得能开口：这一层失败就退回直接答 */
-  }
-}
-
 
 /* ---------------- DeepSeek 流式调用 ---------------- */
 async function streamChat(payload, apiKey, onDelta) {
@@ -1528,7 +1475,6 @@ async function runAgent(ctx) {
 
   const history = [{ role: 'system', content: systemPrompt(mem.notes, null, {
     asOf, anon,
-    mindset: ctx.mindsetNote || null,
     stances: s.stances.map(x => ({ text: x.text })),
   }) }].concat(s.msgs);
 
@@ -1977,4 +1923,4 @@ if (require.main === module) server.listen(PORT, DEPLOY ? '0.0.0.0' : '127.0.0.1
 });
 
 /* 给评测用：导出的是线上同一个函数，不是另写一份 —— 否则测出来的不是真东西。 */
-module.exports = { systemPrompt, voiceBlock, buildMindset, toolCall, searchDocs, DOCS, C, L, CT, SITUATION, TALK, VOICE, getSession };
+module.exports = { systemPrompt, voiceBlock, toolCall, searchDocs, DOCS, C, L, CT, SITUATION, TALK, VOICE, getSession };

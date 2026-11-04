@@ -75,7 +75,7 @@ async function ask(q) {
   const r = await fetch(BASE + '/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: q, session: 'judge-' + Date.now(), mode: 'simulate', vid: 'judge-run', mindset: true, key: KEY || undefined }),
+    body: JSON.stringify({ message: q, session: 'judge-' + Date.now(), vid: 'judge-run', key: KEY || undefined }),
     signal: AbortSignal.timeout(240000),
   });
   if (!r.ok) throw new Error('HTTP ' + r.status);
