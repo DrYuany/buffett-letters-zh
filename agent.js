@@ -1317,120 +1317,52 @@ function systemPrompt(memNotes, mode, opts) {
 - 第一轮证据不够可以换关键词再查，或改查概念档案、公司轨迹、认错档案。
 - 读者是聪明但没有金融背景的人：术语第一次出现时补一句大白话解释。`;
 
-  if (mode === 'simulate' || mode === 'judgment') {
-    return `你是${NAME}的虚拟化身。今天是 ${today}。桌上摊着 ${about}，另有 ${SITUATION ? SITUATION.CASES.length : 0} 条整理好的历史决策案例，只有工具能翻开给你看。${cutoff}
+  /* 统一提示词：一个化身、一套铁律、三种答法，由模型自己判断这一问属于哪种。
+     不再分考据/研判/查数/闲聊四个桶，也不再让外部分类器替他决定。 */
+  return `你是${NAME}的虚拟化身。今天是 ${today}。${cutoff}
+桌上摊着 ${about}，另有 ${SITUATION ? SITUATION.CASES.length : 0} 条整理好的历史决策案例。用第一人称「我」，平静、具体、不夸张。
 
-读者会拿今天 A 股的一件事问你——一家公司、一个指数、一条新闻。他要的不是「如果是你会怎么看」的空话，是你真坐下来翻过财报、算过价格之后会给出的那个判断。用第一人称「我」回答，平静、具体、不夸张。
+【你手上的料——该查哪个工具、查几次，你自己判断，见工具描述】
+- 关于「我当年说过/写过什么」：98 封信原文、股东大会问答、演讲访谈——这是唯一能逐字引用的来源。
+- 关于「今天这件事怎么看」：实时行情、财报（含经营现金流/资本开支/负债率/分红/6 年年报趋势）、资讯、案例库、联网搜索。
+- 关于「出现过多少次」这类计数：用 count_mentions，别凭印象估。
 
-【先拿数，再开口】
-你手上没有今天的行情和财报，凭印象说数字是最丢人的错。开口之前按这个顺序查：
-1. market_snapshot —— 现价、涨跌幅、市值、PE、PB、近五年价格分位，最近四期营收、净利、各自同比、毛利率、ROE、经营现金流、资本开支、资产负债率，外加近 6 年年报趋势和分红历史。问的是指数就传指数名，它会返回 PE/PB 的历史分位。
-2. match_situation —— 把这件事对到旧判断，拿到「尺子」，不是拿答案。
-3. 想知道最近发生了什么（批价、库存、政策、事故、并购、业绩预告、管理层变动、监管处罚），用 market_news 搜公司名或行业名——中文财经资讯比通用搜索准。它和财报要分开说：财报是事实，资讯是别人写的。
-4. 想说「它比同行贵」，必须先 peer_compare，没有参照物就没有贵不贵。
-第一轮就把这几个并行发起。数据没拿到，就在正文里明说这个数没拿到，绝不用记忆里的数字顶上。
-5. 财报接口给不到的、但判断缺不了的关键数字——客户集中度（前五大客户占比）、商誉、有息负债、订单/产能、应收账龄——先用 web_search 搜「公司名 + 关键词」补；真搜不到才在正文里明说没查到，不许当没有。
-market_snapshot / market_news / peer_compare 的返回里会带「引用标记：[[quote|网址]] / [[news|网址]]」，写【现在的事实】时要原样抄上，那是那条数字的出处。
+【铁律——聊什么都适用】
+1. 关于我说过什么，只能来自工具返回的原文；引号里必须逐字、并带出处（[[信|段]] / [[web|网址]] / [[quote|网址]] / [[news|网址]]）。没有原文，就不要说我说过。
+2. 引号只用于逐字原文。我自己的解释、推算、总结，一律不加引号——别把推演冒充原话。
+3. 数字（价格、年份、百分比、倍数）一律来自工具输出，不推算、不凭印象、不拿记忆里的旧数顶。查不到就说查不到，说清「查了什么、缺什么、该去哪查」。
+4. 引用标记只抄工具返回的，不自己编。股东大会/演讲的语料没有 [[信|段]]，那种写清「哪一年、什么场合」就够了；工具标了「概述，不可逐字引用」的，只能理解情形、不能当原话。
 
-【五段，标题照抄，各占一行】
-【我确实说过】
-只放工具返回里逐字不改的原话，每句后跟 [[信|段]]。没有就写「这些信里没查到直接对应的原话」。这一区最多三句，不要拿它占篇幅。
+【读者问的是过去——我当年说过/写过什么】
+先一句结论，再铺逐字原文（每句带 [[信|段]]），最后一句「所以这意味着什么」。600-900 字，宁短勿长。
+信外的语录（股东大会问答、演讲、访谈、新闻里的原话），你手上没有可逐字核对的原文，一律转述、不加引号；非要引就注明哪个场合、给链接。
 
-【现在的事实】
-3 到 6 条，每条一个数字或一件已发生的事，必须带日期或报告期，并且末尾跟上它的出处标记——照抄工具返回的「引用标记：[[quote|网址]] / [[news|网址]]」，一个字都不要改。
-像这样写：2026 年三季报营收 1332.8 亿元、同比 +1.8%；净利 644.7 亿元、同比 -0.3%；当前 PE 20.9 倍 [[quote|https://quote.eastmoney.com/sh600519.html]]。
-行情/财报用 [[quote|…]]，资讯（批价、政策、事故、公告）用 [[news|…]]，别混用。
-不许写「业绩承压」「估值处于低位」「行业景气度上行」这类没有数字的判断句——那是把结论当事实。
+【读者拿今天的事要判断——这家公司/这件事怎么看、该不该买】
+先拿数再开口，别凭印象说数字：
+1. market_snapshot —— 现价、涨跌幅、市值、PE、PB、价格分位、四期财报（营收/净利/同比/毛利率/ROE/经营现金流/资本开支/负债率/货币资金）、近 6 年年报趋势、分红历史。
+2. match_situation —— 把这件事对到旧判断，拿「尺子」。
+3. 想知道最近发生了什么，用 market_news；想说「它比同行贵」，先 peer_compare。
+4. 财报接口给不到的（客户集中度、商誉、有息负债、订单产能），用 web_search 补；都拿不到就在正文里明说。
+用五段，标题照抄：【我确实说过】【现在的事实】【我怎么量它】【所以】【我可能错在哪】。
+  - 【我确实说过】只放工具返回里逐字不改的原话，每句后跟 [[信|段]]，最多三句；没有就写「没查到」。
+  - 【现在的事实】3-6 条，每条一个数字或一件已发生的事，带日期或报告期，末尾跟上出处标记（[[quote|…]] 行情财报 / [[news|…]] 资讯）。不许写「业绩承压」「估值处于低位」这种把结论当事实的句子。
+  - 【我怎么量它】2-4 个角度，每个 = 尺子（〔案例id〕 或 [[信|段]] 或「哪一年、什么场合」）+ 读数 + 判断。
+  - 【所以】买/不买/等/看不懂，四选一，不许和稀泥；拿两样硬比也要落结论。
+  - 【我可能错在哪】一个能被当面反驳的证伪点。
+标「⚠ 反向对照」的案例只能对比、不能当依据；match_situation 只返回「原则」就明说这是原则不是先例。
+读者问「明天涨不涨」「给个代码」「满仓行不行」照样拒绝（那是预测和荐股）；问「这家公司怎么样」「值不值得买」是判断，必须给立场。
+全文 1000-1400 字，宁可短。写不下先砍【我确实说过】的句数。
+被问「这个数字/事实从哪里来」时，先指出上一轮答案里那条事实后面的 [[quote|…]]/[[news|…]] 标记，不确定就重新调工具核实，别凭印象编来源。
+结尾说清：这是按旧判断推演，不是承诺。
 
-【我怎么量它】
-2 到 4 个角度。每个角度写三样东西，缺一不可：
-（一）尺子：这条判断标准从哪条旧判断来的。三种标法任选，但必须是工具真返回过的：标 〔案例id〕；标 [[信|段]]；写清「哪一年、什么场合」（如 1999 年股东大会）或「哪个工具算的」（如 peer_compare）。股东大会和演讲的语料没有信件标记，那种情形就用第三种，绝不许自己编一个 [[ ]]；
-（二）数字：这把尺子量在这家公司身上，读数是多少；
-（三）判断：这个读数说明生意变好了还是变坏了。
-一个角度写完再写下一个，不要揉成一大段。示范：
-- 提价能力（〔rule-148〕）：毛利率 89.6%，五年没掉下过 88%，说明提价没把经销商逼走。但营收只增 1.8%，量已经不动了，增长只剩提价一条腿。这是好生意变钝，不是变坏。
-- 资本消耗（[[1997 巴菲特致股东信|126]]）：营收增 56%，资本开支同期增多少、负债率有没有升，直接决定这增长是白赚的还是买来的。
+【其余情况——查个数、问一句事实、闲聊、问你自己参考什么语料】
+直接答，一两句到三四句。需要数字就调工具给出处；纯闲聊用常识，别装成信里的话、别硬套五段、别编 [[ ]]。
 
-【所以】
-一句明确的话：买、不买、等，或者「看不懂，不碰」。不许「因人而异」「需要综合考虑」「建议关注」。
-说看不懂就要说清看不懂的是哪一件事——不是「行业太复杂」，是「我算不出它三年后还能不能继续提价」。
-遇到拿两样东西硬比的问法（「高股息是不是比存款划算」「这股是不是比买理财强」），
-也必须落一个结论：先说清这两样按哪把尺子不可比，再说真要在两者里选，你选哪边。
-不许用「所以我给不了你结论」收尾——那是把判断推回给读者。
-
-【我可能错在哪】
-一条最可能错的地方，具体到能被人当面反驳；再加一个可观察的证伪点：
-「如果下季度毛利率跌破 85%，我上面那条就作废。」
-
-【其他铁律】
-1. 每个数字都必须来自工具输出，包括年份、价格、百分比、倍数。不许推算，不许凭印象，不许拿常识补。
-2. 只在【我确实说过】里用引号引原信里的话。其余地方不许用引号；提我过去的判断就标 〔案例id〕 或 [[信|段]]，别把没在工具里查到的句子写成「我说过」「我在某年写过」——标了出处才作数。
-3. 标了「⚠ 反向对照」的案例只能拿来对比，要说明它相反在哪，不能当本次判断的依据。
-3b. 如果 match_situation 返回的全是「原则」而没有具体决策，就在那个角度上明说「这是原则，不是某次具体决策」，不要把它包装成一次先例。
-4. 读者问「明天涨不涨」「给我一个代码」「现在满仓行不行」，照样拒绝——那是预测和荐股。但问「这家公司怎么样」「现在值不值得买」，那是判断，必须给明确立场。他一辈子拒的是预测大盘和短期走势，从不拒绝对一家公司下判断。
-5. 工具返回里标了「概述，不可逐字引用」的文字，只能用来理解情形，不能当原话。
-6. 全文 1000-1400 字，宁可短。【我怎么量它】2 到 3 个角度，不要凑第四个；【现在的事实】3 到 5 条，不要凑第六条。写不下时先砍【我确实说过】的句数，再压事实条数——【所以】和【我可能错在哪】一段都不能少，被截断比写短更糟。
-7. 被问「这个数字/事实从哪里来、有来源吗」时，不要重答整件事：先指出上一轮答案里那条事实后面的 [[quote|…]] / [[news|…]] 标记，说清那是东财行情/财报还是哪家媒体的资讯；如果那条没标、或你记不准确切出处，就重新调对应工具核实，绝不凭印象编一个来源。
 ${voiceBlock(opts.noVoice)}
 ${BOUNDS}
 ${work}
-- 第一轮并行发起：market_snapshot（拿数）+ match_situation（拿尺子）。需要同行参照就补 peer_compare，事情有近期进展就补 web_search。
-
 ${reader}
-${stanceBlock}${mindBlock}
-最后一句必须说清：这是按旧判断推的，不是我对今天这件事的承诺。`;
-  }
-
-  if (mode === 'lookup') {
-    return `你在回答读者查的一个具体数字或事实。今天 ${today}。
-读者不是要你下判断、也不是要你给立场，就是问一个数或一件事实。
-
-【怎么答】
-- 直接给答案，一两句到三四句，别展开成研判，别给「该不该买」。
-- 数字必须先查工具：行情/总市值/PE/PB/财报用 market_snapshot；「X 出现多少次」用 count_mentions；快照里没有的（流通市值、股权结构、某年某月某日价格、股东名单）用 web_search。
-- 查到就写数字 + 出处：market_snapshot 的返回里带「引用标记：[[quote|网址]]」，照抄；web_search 的给链接。
-- 查不到就说清「查了什么、没拿到什么」，别编一个数。
-- 不用【我确实说过】【现在的事实】那套五段结构，这里是问答不是研判。
-${BOUNDS}
-${reader}`;
-  }
-
-  if (mode === 'chat') {
-    return `你是${NAME}的虚拟化身，正在和读者闲聊。今天 ${today}。
-读者这句话不是要你查原话、也不是要你研判某家公司，就是一句常识或闲话。
-
-【怎么答】
-- 用第一人称、像他自己那样自然地答，一两句到三四句，别端着，也别硬把话题拉回投资。
-- 直接用自己的常识答，不用查任何工具。
-- 如果这件事和巴菲特、和投资、和他写过的信没关系，就明说「这不在我信里，是我作为普通人的常识」——别把它包装成他说过的话，也别硬套他的投资观。
-- 不要凭空编 [[ ]] 引用标记，也不要假装这件事写在信里。
-${voiceBlock(opts.noVoice)}
-${BOUNDS}
-${reader}`;
-  }
-
-  return `你是「巴菲特午餐会」的主持人。桌上摊着 ${about}，只有工具能把它翻开给你看。
-
-【铁律】
-1. 凡是"他说过什么"，必须来自工具返回的原文，并且逐字引用。不许改写，不许用你的背景知识补句子。
-2. 工具没给你原文，就不能说他讲过。宁可回答"这 ${C.meta.letters} 封信里没查到"，也不要替他把话补完。
-3. 每段原文证据后面都跟它的引用标记（形如 [[1988 巴菲特致股东信|12]] 或 [[web|网址]]），照抄工具输出，一个字都不要改。
-4. ${C.meta.years[1]} 年之后的事要用 web_search 查，答案里必须说清这是网络来源，不能和他信里写的话混在一起。
-5. 数字（回报率、价格、年份、持股比例）一律来自工具输出，不得推算拼凑。信里没写的数字（股东大会问答、年报数据、市值、资本基数），要么用 web_search 查到出处再给，要么就不给——不许拿记忆里的旧数字凑数。被问到"X 出现了多少次""X 在多少封信里"这类次数题，必须先调 count_mentions 拿到精确数字再回答，不许凭印象估。
-6. 引号只用于逐字原文。引号里那一段必须能在原文里一字不差地找出来，否则不要用引号——你可以转述，但要让人看出来是转述，不要骗读者当成原话。你自己的解释、自己的推算、自己的总结，一律不加引号，哪怕你觉得说得很准。
-7. 工具没查到、就是没查到。问"他对子女教育的看法"如果信里没说，就直说没说，不许拿别处谈"教育"的句子拼凑引申。
-8. open_passage 说"这是小标题"时，正文在它给出的下一段。引用必须指向真正读到那句话的正文段，不许引小标题段，更不许凭记忆把小标题下面的正文补出来。
-9. 问"现在/最近/今年"的数字（现金储备、持仓、股价、业绩），信只写到 ${C.meta.years[1]} 年，必须 web_search 并打开官网或财报原文。确实拿不到确切数字时，说清"查了什么、拿到什么、缺什么、该去哪查"，不要只回一句"查不到"就完事。
-10. 信外的语录（股东大会问答、演讲、访谈、新闻里的原话），你手上没有可逐字核对的原文，一律转述、不加引号；非要引就注明是哪个场合、并给出网页链接。引号是给信里原文用的，不是给"你记忆里他说过的话"用的。
-11. 只有工具明确写了「引用标记：[[...]]」的段落才能用 [[ ]]。talk_search / speech_search 返回的股东大会、演讲内容没有这种标记，绝不许自己编一个 [[2022 年股东大会（下午场）|1]] —— 那不是信，读者点过去是空的。写清「哪一年、什么场合」就够了。
-${voiceBlock(opts.noVoice)}
-${BOUNDS}
-${work}
-- 结构：先一句结论，再铺原文证据，最后一句"所以这意味着什么"。控制在 600-900 字以内，写不完就挑最重要的说，宁短勿长。
-
-${reader}
-
-今天是 ${today}。`;
+${stanceBlock}${mindBlock}`;
 }
 
 /* ---------------- 先想后说 ----------------
@@ -1588,24 +1520,13 @@ async function runAgent(ctx) {
 
   const mem = await readMemory();
   let tools = web ? TOOLS.slice() : TOOLS.filter(t => t.function.name !== 'web_search' && t.function.name !== 'open_url');
-  /* 情形匹配只给研判桶用；其余桶（quote/lookup/chat）保持原样，别把旧评测的口径搅乱。 */
-  if (mode !== 'judgment') tools = tools.filter(t => t.function.name !== 'match_situation' && t.function.name !== 'case_detail');
-  /* 闲聊桶：不查任何工具，直接用自己的常识答。 */
-  if (mode === 'chat') tools = [];
   /* 回测：联网和"几十年揉在一起"的档案必须摘掉，否则时间闸门形同虚设 */
   if (asOf) tools = tools.filter(t => ['web_search', 'open_url', 'concept_profile', 'company_timeline'].indexOf(t.function.name) < 0);
   const s = getSession(session);
   s.msgs.push({ role: 'user', content: message });
   if (s.msgs.length > 16) s.msgs = s.msgs.slice(-16);
 
-  /* 先想后说：只给研判桶用。想不出来（超时、报错）就跳过，不挡着开口。
-     前端会收到一条 step，读者看到的是「他在想」，不是六问全文。 */
-  if (mode === 'judgment' && ctx.wantMindset !== false) {
-    emit('step', { text: '先在心里过一遍：能力圈 / 护城河 / 管理层 / 价格 / 最像的三次 / 我容易错在哪' });
-    ctx.mindsetNote = await buildMindset({ question: message, apiKey, model, asOf, anon });
-  }
-
-  const history = [{ role: 'system', content: systemPrompt(mem.notes, mode, {
+  const history = [{ role: 'system', content: systemPrompt(mem.notes, null, {
     asOf, anon,
     mindset: ctx.mindsetNote || null,
     stances: s.stances.map(x => ({ text: x.text })),
@@ -1624,10 +1545,9 @@ async function runAgent(ctx) {
     emit('delta', { text: txt });
   };
 
-  /* 研判桶要写满五段，而且这类模型先花两三千 token 在推理上，4096 的预算被推理吃掉一半。
-     实测有 5% 的分身答案卡在 length：写到【我怎么量它】中间就停，连【所以】都没出来。
-     其余桶没这个问题（结构短），保持原值，别顺手把成本抬上去。 */
-  const MAXTOK = mode === 'judgment' ? 8192 : 4096;
+  /* 研判要写满五段，这类模型先花两三千 token 在推理上，4096 会被吃一半；
+     统一提示词后不再按桶切预算，一律给足，简单问题它自然会提前收笔。 */
+  const MAXTOK = 8192;
   for (rounds = 1; rounds <= MAX_ROUNDS; rounds++) {
     const payload = { model, messages: history, tools, stream: true, max_tokens: MAXTOK, temperature: 0.3 };
     /* 一边收 token 一边发给前端；万一这一轮改主意要去调工具，
@@ -1692,13 +1612,7 @@ async function runAgent(ctx) {
 
   if (!final) {
     /* 循环用尽还没张口：逼它把已经查到的东西说完 */
-    history.push({ role: 'user', content: mode === 'judgment'
-      ? '（工具额度已用尽，请立刻按五段写完：【我确实说过】【现在的事实】【我怎么量它】【所以】【我可能错在哪】，一段都不能少，数字只用手上已有的）'
-      : mode === 'lookup'
-        ? '（工具额度已用尽，请直接给出你查到的数字并附出处；查不到就明说没查到）'
-        : mode === 'chat'
-          ? '（直接回答读者即可）'
-          : '（工具额度已用尽，请立刻基于你手上的原文作答，并附上引用标记）' });
+    history.push({ role: 'user', content: '（工具额度已用尽，请立刻基于你手上的材料作答：如果读者要判断就用五段写全、数字只用手上已有的；如果是查数/闲聊就直接答；引用照抄工具返回的标记）' });
     const acc = await streamChat({ model: model, messages: history, stream: true, max_tokens: MAXTOK, temperature: 0.3 }, apiKey, onDelta);
     spans.push({ i: spans.length, type: 'llm', round: rounds, forced: true, ms: acc.ms, ttft: acc.ttft,
       finish: acc.finish, prompt_tokens: (acc.usage || {}).prompt_tokens || 0,
@@ -1714,7 +1628,7 @@ async function runAgent(ctx) {
      为什么机械截取而不让模型自己总结：模型「总结自己刚说过什么」经常总结成
      更漂亮但不等于原意的话，下一轮就拿这句漂亮话当立场，越走越偏。
      第一句是他真正下判断的那句，短、硬、可对账。 */
-  if (mode === 'judgment') {
+  {
     const h2 = text.indexOf('【按这些依据推演】');
     if (h2 >= 0) {
       const body = text.slice(h2 + '【按这些依据推演】'.length).trim();
@@ -1752,7 +1666,7 @@ async function runAgent(ctx) {
   if (s.msgs.length > 16) s.msgs = s.msgs.slice(-16);
   return { rounds: rounds, calls: calls, usage: final.usage,
     spans: spans, ttft: ttft, ms: Date.now() - t0,
-    answer: text, sources: used, all_sources: allSources, bucket: mode };
+    answer: text, sources: used, all_sources: allSources };
 }
 
 /* 服务端自带的密钥。有它，就是「本机模式」：谁来都不用填密钥，也只花主人的钱。 */
@@ -1852,103 +1766,8 @@ function appendTrace(rec) {
   return _traceQ;
 }
 function hashId(s) { return crypto.createHash('sha256').update(String(s || '')).digest('hex').slice(0, 16); }
-/* 问题分诊：这个产品只有两类问题——问过去，和问今天。
-   读者不该记哪个按钮对应哪类：问「他当年怎么说」就翻信逐字答，
-   问「这家公司现在怎么样」就该拿行情财报做研判，硬翻旧信只会答非所问。
-
-   规则只做粗筛，判不准时偏向 archive —— 那条路走不通会明说「信里没查到」，
-   不会编数字；反过来把考据题当研判，就会拿今天的数据去回答一个历史问题。 */
-function triageMode(message, mode) {
-  const msg = String(message || '');
-  const askPast = /(他说过|他讲过|他提过|信里|原话|哪一年|哪封信|怎么说的|有没有提过|写过什么|提过几次)/.test(msg);
-  const askNow = /(现在|目前|最近|今年|今天|当下|这会儿|该不该买|值不值|能不能买|能不能持有|贵不贵|便宜吗)/.test(msg);
-  const askView = /(你|您)怎么(看|想)|你会怎么做|换成你|如果是你/.test(msg);
-  /* 决策型的问法：句子里没有时间词，问的却是「我现在该不该动」。
-     漏了这一类，「银行股股息率这么高，是不是比存银行划算」会被判成考据题 ——
-     实测那次退回了叙述体，五段结构和立场全丢（eval/judge.js 结构 3/5）。
-     注意别把「抄底」单独当信号：real-002「1974 年和 2008 年他抄底时」是历史题，
-     必须留在 archive。所以要求「抄底/上车/割肉」前面带决策词。 */
-  const askDecide = /(该不该|值不值|划不划算|能不能(买|持有|追|上车)|还能(追|买)|追不追|要不要(买|卖|加|减|换)|(该|能|要)不该?(抄底|上车|割肉)|是不是比.{0,14}(划算|强|稳|好)|比.{0,10}(划算|强|稳))/.test(msg);
-  if (mode === 'simulate') return (askPast && !askNow && !askView) ? 'archive' : 'simulate';
-  if (askPast) return 'archive';
-  return (askNow || askView || askDecide) ? 'simulate' : 'archive';
-}
-/* 确定性四桶粗判：只有这些高置信模式才直接拍板，拿不准一律返回 null 交给分类器。
-   为什么要有这一层：实测「茅台流通市值是多少」两次分类一次 lookup 一次 judgment，
-   单次 flash 分类在「查数 vs 研判」这条边界上不稳。正则是确定的，先把这些无歧义的
-   模式锁死，LLM 只管剩下真正模棱两可的那部分 —— 既更稳，也省掉不必要的分类调用。 */
-function triageBucket(message) {
-  const msg = String(message || '');
-  /* chat：起名/来历/寒暄。这类问题永远不是研判、不是考据、不是查数。 */
-  if (/(为什么叫|为什么取|为何叫|为啥叫|名字(是)?(怎么|如何)(来|取|起)的|名字的由来|起名|命名|你是谁|你好|谢谢|再见|拜拜|吃了吗|今天天气)/.test(msg)) return 'chat';
-  /* quote：问「他」说过/写过/提过什么 —— 排在 lookup 前面，因为「提过几次」是考据不是查数。 */
-  if (/(他说过|他讲过|他提过|信里|原话|哪封信|怎么说的|有没有提过|写过什么|提过几次|说过什么|说过哪些)/.test(msg)) return 'quote';
-  /* lookup：查一个具体数字或事实。只认「是多少 / 多少钱 / 哪年成立」这类无歧义问法，
-    不认光秃秃的「市值」（那可能是「市值合理吗」这种研判题）。 */
-  if (/(是多少|多少钱|多少亿|多少倍|市盈率是多少|PE是多少|PB是多少|出现过几次|提到过几次|提到几次|哪年成立|哪一年成立|哪一年出生|哪年上市|什么时候成立|什么时候上市|创始人是谁|董事长是谁)/.test(msg)) return 'lookup';
-  /* judgment：今天这件事怎么看 / 该不该动。沿用 triageMode 的判据，补上「跌/涨」的口语信号。 */
-  const askNow = /(现在|目前|最近|今年|今天|当下|这会儿|该不该买|值不值|能不能买|能不能持有|贵不贵|便宜吗|跌了|涨了|为什么跌|为什么涨)/.test(msg);
-  const askView = /(你|您)怎么(看|想)|你会怎么做|换成你|如果是你/.test(msg);
-  const askDecide = /(该不该|值不值|划不划算|能不能(买|持有|追|上车)|还能(追|买)|追不追|要不要(买|卖|加|减|换)|(该|能|要)不该?(抄底|上车|割肉)|是不是比.{0,14}(划算|强|稳|好)|比.{0,10}(划算|强|稳))/.test(msg);
-  if (askNow || askView || askDecide) return 'judgment';
-  return null;
-}
-/* ---------------- 问题类型路由（四桶） ----------------
-   身份（人设）和答题形态要分开：身份由前端按钮定，答题形态由这句话本身定。
-   上面的 triageMode 正则只能认出「考据 vs 研判」，认不出「查一个数」「闲聊一句」——
-   可会话里大量追问正是这两类（上一句问茅台怎么跌、下一句问「茅台为什么叫这个名字」）。
-   所以：先 triageBucket 确定性判，判不准再由一次便宜的分类调用补；分类也失败就退回正则。 */
-const BUCKETS = ['judgment', 'lookup', 'quote', 'chat'];
-async function classifyBucket(message, wantMode, apiKey) {
-  const det = triageBucket(message);
-  if (det) return det;
-  const sys = `你是对话路由器。判断读者这句话属于哪一类，只输出一个词：judgment / lookup / quote / chat。不要解释，不要标点。
-
-quote —— 问「他（巴菲特）说过/写过/提过什么」：翻信件、股东大会、演讲原文。信号：「他说过」「原话」「哪封信」「提过几次」。
-judgment —— 拿今天 A 股一件事（公司/指数/新闻/价格）要「你怎么看 / 该不该买 / 值不值 / 会不会怎么做」：下判断、给立场。
-lookup —— 查一个具体数字或事实，答案本身是一个数或一句事实：市值、PE、某年利润、某词出现几次、哪年成立、创始人是谁、流通市值是多少。不要立场。
-chat —— 与投资、与信件无关的常识或闲聊，以及起名/来历题：「茅台为什么取这个名字」「茅台名字的由来」「今天天气」「你是谁」。
-
-边界示例（照这个判）：
-「茅台为什么取这个名字」→ chat
-「茅台名字是怎么来的」→ chat
-「茅台流通市值是多少」→ lookup
-「茅台 PE 是多少」→ lookup
-「巴菲特提过几次保险浮存金」→ quote
-「什么是保险浮存金」→ quote
-「他最糟糕的一笔投资是哪个」→ quote
-「巴菲特是哪一年出生的」→ lookup
-「伯克希尔是哪一年成立的」→ lookup
-「茅台跌了你怎么看」→ judgment
-「茅台现在该不该买」→ judgment
-「可口可乐哪年上市的」→ lookup
-
-规则：
-- 追问按追问本身判，别被上一句带偏。
-- 起名/来历/名字由来（「为什么叫」「为什么取」「名字是怎么来的」「命名的由来」）一律 chat，不管主语是不是股票或公司。
-- 「XX 是多少」「XX 出现过几次」「XX 哪年成立/上市/出生」是 lookup——即使带「巴菲特」「伯克希尔」主语，也是查一个年份或数字，不是翻原话。
-- 「什么是[概念]」（什么是浮存金、什么是护城河）→ quote：翻他信里/会上的原话解释，不是查一个数。
-- 「他最糟糕的/最失败的[投资/决定/收购]」→ quote：走认错档案，翻他的原话，不是查数。
-- 「该不该买」「值不值」「会不会涨」「你怎么看」是 judgment。
-- 拿不准是不是要翻他原话时，归 quote。`;
-  const usr = '读者说：' + String(message || '').slice(0, 600) +
-    (wantMode === 'simulate' ? '\n（读者当前在「问分身」模式，但以这句话本身为准，模式只作弱参考）' : '');
-  const r = await fetch(DEEPSEEK, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'deepseek-flash',
-      messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }],
-      temperature: 0, max_tokens: 512, stream: false,   /* flash 是推理模型，12 会被思考吃光、返回空内容 */
-    }),
-  });
-  if (!r.ok) throw new Error('分类服务返回 ' + r.status);
-  const j = await r.json();
-  const t = ((j.choices && j.choices[0] && j.choices[0].message.content) || '').toLowerCase();
-  const hit = BUCKETS.find(b => t.indexOf(b) >= 0);
-  if (!hit) throw new Error('分类结果无法识别：' + t);
-  return hit;
-}
+/* 问题分诊已移除：不再用正则/LLM 分类器给问题分桶。
+   统一提示词里写清三种答法（查原话 / 研判 / 直接答），由模型自己判断这一问属于哪种。 */
 /* 答案里的引用标记 [[信|段]] / [[web|url]] —— 判「引用存不存在」就从这里下手。
    注意「信」那一截是信件 id（形如「2018 巴菲特致股东信」），不是数字下标。 */
 /* URL 型引用标记的类别：[[web|…]] 通用网页、[[quote|…]] 行情/财报、[[news|…]] 资讯。
@@ -2054,9 +1873,7 @@ function buildTrace(q, vid, keySource, model, info, errMsg) {
     session: String(q.session || 'default').slice(0, 40),
     vid_hash: hashId(vid),
     question: String(q.message || '').slice(0, 2000),
-    model: model, web: q.web !== false, mode: q.mode === 'simulate' ? 'simulate' : 'archive',
-    bucket: info ? (info.bucket || null) : null,
-    route_ms: info ? (info.route_ms || null) : null,
+    model: model, web: q.web !== false, mode: 'unified',
     key_source: keySource,
     spans: info ? info.spans : [],
     sources: info ? info.sources : [],
@@ -2121,34 +1938,17 @@ function emitSSE(res, q, ip) {
       } else {
         emit('quota', { left: 0, total: FREE_PER_VISITOR, keySource: 'byo' });
       }
-      const wantMode = q.mode === 'simulate' ? 'simulate' : 'archive';
-      /* 每次都由分类调用判定四桶（judgment/lookup/quote/chat）；分类失败退回正则的 archive/simulate。
-         计时：分类器是每次提问多花的一次 flash 调用（推理模型），成本/延迟要进 trace 才看得见。 */
-      const _route0 = Date.now();
-      let bucket;
-      try {
-        bucket = await classifyBucket(q.message, wantMode, apiKey);
-      } catch (e) {
-        bucket = triageBucket(q.message) || (triageMode(q.message, wantMode) === 'simulate' ? 'judgment' : 'quote');
-        console.log('  [分诊] 分类器失败（' + e.message + '），退回正则：' + bucket);
-      }
-      const routeMs = Date.now() - _route0;
-      const bucketHint = wantMode === 'simulate' ? 'judgment' : 'quote';
-      if (bucket !== bucketHint) console.log(`  [分诊] 前端说 ${wantMode}，按问题内容改走 ${bucket}：${String(q.message).slice(0, 40)}`);
       const info = await runAgent({
         message: String(q.message || '').slice(0, 2000),
         session: String(q.session || 'default').slice(0, 40),
         /* 默认走快的那个：坐着聊天等 40 秒太长。想要更细的推理再选 pro。 */
         model: model,
         web: q.web !== false,
-        mode: bucket,
         asOf: q.as_of || '',
         anon: q.anon === true || q.anon === 1,
-        wantMindset: q.mindset !== false,
         key: apiKey,
         emit: emit
       });
-      info.route_ms = routeMs;   /* 路由耗时（分类器 + 可能的降级），进 trace 算账 */
       emit('done', info);
       writeTrace(q, vid, keySource, model, info, null);
     } catch (e) {
