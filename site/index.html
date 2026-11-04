@@ -805,6 +805,21 @@ function ensureCorrectionsAux(){
   });
   return _cauxPromise;
 }
+/* data-cases.js 懒加载：只有进规则库页/记分牌页才拉（会议/演讲 LLM 抽出的规则与记分牌案例）。
+   缺失时静默降级——规则库/记分牌页只显示信件来源，不影响主体。 */
+var _casesPromise = null, _casesTried = false, CASESX = null;
+function ensureCases(){
+  if (CASESX || _casesTried) return Promise.resolve();
+  if (_casesPromise) return _casesPromise;
+  _casesPromise = new Promise(function(resolve){
+    var s = document.createElement('script');
+    s.src = 'data-cases.js';
+    s.onload = function(){ CASESX = window.CASES; _casesTried = true; resolve(); };
+    s.onerror = function(){ _casesTried = true; resolve(); };
+    document.head.appendChild(s);
+  });
+  return _casesPromise;
+}
 /* 语料真实年份范围（第一封是 1956 有限合伙协议，不是 1957） */
 var CY0 = Math.min.apply(null, C.letters.map(function(l){ return l.year; }));
 var CY1 = Math.max.apply(null, C.letters.map(function(l){ return l.year; }));
@@ -1487,6 +1502,33 @@ function score(){
     });
     h += '</div>';
   }
+
+  /* 会议/演讲里 LLM 抽出的记分牌案例（无信件 loc，不能跳信，纯展示）。
+     只在 CASESX 到位且非空时追加，缺失时记分牌页仍只显示信件来源。 */
+  if (CASESX && CASESX.cases){
+    var msc = CASESX.cases.filter(function(c){
+      return c.src && (c.src.kind === 'meeting' || c.src.kind === 'speech') && c.kind === 'scorecard';
+    }).sort(function(a, b){ return a.y - b.y; });
+    if (msc.length){
+      h += '<h2 class="h2">会议 / 演讲记分牌 · ' + msc.length + ' 条</h2>' +
+        '<p class="lead" style="margin-bottom:14px">以下由大模型从会议/演讲语料自动抽取，仅作线索参考，非逐字核对的信件原话。</p>';
+      msc.forEach(function(c){
+        var vt = c.verdict === 'hit' ? '命中' : c.verdict === 'miss' ? '错判' :
+                 c.verdict === 'mix' ? '参半' : '未评';
+        var vcls = c.verdict ? c.verdict : 'autotag';
+        h += '<div class="sc">' +
+          (c.entity ? '<h3>' + esc(c.entity) + '</h3>' : '') +
+          '<div class="scmeta"><span class="tag ' + vcls + '">' + vt + '</span>' +
+          '<span class="tag src">' + esc(caseSrcLabel(c)) + '</span>' +
+          '<span class="tag autotag">自动整理 · 未逐条核对</span></div>' +
+          '<div class="claim"><span class="lb">' + c.y + ' 年他说</span>「' + esc(c.judgment) + '」</div>' +
+          (c.situation ? '<div class="out"><span class="lb">背景</span>' + esc(c.situation) + '</div>' : '') +
+          (c.lesson ? '<div class="out" style="margin-top:8px;background:var(--accent-soft)">' +
+            '<span class="lb" style="color:var(--accent)">教训</span>' + esc(c.lesson) + '</div>' : '') +
+          '</div>';
+      });
+    }
+  }
   return h;
 }
 var coQ = '';
@@ -1689,6 +1731,14 @@ function locLink(loc, label){
 function jumpAttr(loc){
   return loc ? ' data-jump="#/l/' + encodeURIComponent(loc.l) + '?b=' + loc.b + '"' : '';
 }
+/* 会议/演讲案例的来源标签（无信件 loc，不能跳信，纯展示） */
+function caseSrcLabel(c){
+  if (!c || !c.src) return '';
+  if (c.src.kind === 'meeting'){
+    return c.y + ' 股东大会（' + (c.src.who === 'munger' ? '芒格' : '巴菲特') + '）';
+  }
+  return c.y + (c.src.venue ? ' ' + c.src.venue : '') + '（巴菲特）';
+}
 
 /* ================= 第一步：公司记分牌（全量时间线） ================= */
 function companyPage(name){
@@ -1817,7 +1867,36 @@ function rules(){
       locLink(r.loc, '看原文 ↗') +
       '<span class="tag p">原话</span></div></div>';
   });
-  if (!out.length) h += '<div class="empty">没有匹配的规则</div>';
+  /* 会议/演讲里 LLM 抽出的规则（无信件 loc，不能跳信，纯展示）。
+     只在 CASESX 到位且非空时追加，缺失时规则库页仍只显示信件规则。
+     同样受搜索框过滤，避免下面挂着一大串跟搜索词无关的条目。 */
+  var mrs = [];
+  if (CASESX && CASESX.cases){
+    mrs = CASESX.cases.filter(function(c){
+      return c.src && (c.src.kind === 'meeting' || c.src.kind === 'speech') && c.kind === 'rule';
+    });
+    if (q){
+      mrs = mrs.filter(function(c){
+        var hay = [c.judgment, c.lesson, c.situation, c.entity, (c.tags || []).join(' ')].join(' ');
+        return hay.indexOf(q) !== -1 || String(c.y).indexOf(q) !== -1;
+      });
+    }
+    mrs = mrs.sort(function(a, b){ return a.y - b.y; });
+    if (mrs.length){
+      h += '<h2 class="h2">会议 / 演讲里说的规则 · ' + mrs.length + ' 条</h2>' +
+        '<p class="lead" style="margin-bottom:14px">以下由大模型从会议/演讲语料自动抽取，仅作线索参考，非逐字核对的信件原话。</p>';
+      mrs.forEach(function(c){
+        var jt = esc(c.judgment);
+        if (q) jt = jt.split(esc(q)).join('<mark>' + esc(q) + '</mark>');
+        h += '<div class="rule"><div class="rt">「' + jt + '」</div><div class="rm">' +
+          '<b style="color:var(--accent)">' + c.y + '</b>' +
+          '<span class="tag src">' + esc(caseSrcLabel(c)) + '</span>' +
+          (c.lesson ? '<span style="color:var(--ink3)">教训：' + esc(c.lesson) + '</span>' : '') +
+          '</div></div>';
+      });
+    }
+  }
+  if (!out.length && !mrs.length) h += '<div class="empty">没有匹配的规则</div>';
   return h;
 }
 
@@ -2635,13 +2714,15 @@ function render(){
   var needL = NEEDS_L[p[1]] && !L;
   var needMaux = (p[1] === 'e') && !MAUX && !_mauxTried;
   var needCaux = (p[1] === 'corr') && !CAUX && !_cauxTried;
-  if (needL || needMaux || needCaux){
+  var needCases = (p[1] === 'rules' || p[1] === 'score') && !CASESX && !_casesTried;
+  if (needL || needMaux || needCaux || needCases){
     app.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--ink2);font-size:14px">'
       + '<span class="boot-dot" style="margin-right:8px"></span>正在加载…</div>';
     var jobs = [];
     if (needL) jobs.push(ensureLetters());
     if (needMaux) jobs.push(ensureMentionsAux());
     if (needCaux) jobs.push(ensureCorrectionsAux());
+    if (needCases) jobs.push(ensureCases());
     Promise.all(jobs).then(function(){ render(); })
       .catch(function(e){
         app.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--ink2)">'
