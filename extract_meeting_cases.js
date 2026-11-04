@@ -25,6 +25,10 @@ const M = require('./meeting');
 
 const KEY = fs.readFileSync(path.join(__dirname, '_agent.key'), 'utf8').trim();
 const API = 'https://api.deepseek.com/chat/completions';
+/* 2026-11-04 实测教训：deepseek-v4-pro 是推理模型，180 批抽了 5.3 小时、成本偏高。
+   若再跑大规模抽取（或重抽会议），把 MODEL 换成 'deepseek-flash'——
+   抽取是照抄 judgment 的机械活，不需要推理模型的思考，flash 快 10 倍、便宜 5 倍，
+   质量损失靠信号词预筛 + 人工审兜住。 */
 const MODEL = 'deepseek-v4-pro';
 
 const DEBUG = process.argv.includes('--debug');

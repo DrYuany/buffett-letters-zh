@@ -1283,11 +1283,24 @@ function entity(kind, name){
   var byYear = {};
   ms.forEach(function(m){ (byYear[m[0]] = byYear[m[0]] || []).push(m); });
   var years = Object.keys(byYear).map(Number).sort(function(a,b){ return a-b; });
+  var mMeet = (MAUX && MAUX.meeting[name]) ? MAUX.meeting[name].length : 0;
+  var mSpeech = (MAUX && MAUX.speech[name]) ? MAUX.speech[name].length : 0;
+
+  /* 头部计数把会议/演讲也算进去：纯会议实体（如好市多）不再显示「0 个年份、0 段」 */
+  var eenTxt = '';
+  if (ms.length + ov > 0) {
+    eenTxt = '在 ' + years.length + ' 个年份、' + (ms.length + ov) + ' 段中出现' +
+      (mMeet || mSpeech ? '；会议 ' + mMeet + ' 段、演讲 ' + mSpeech + ' 段' : '');
+  } else if (mMeet || mSpeech) {
+    eenTxt = '在会议 ' + mMeet + ' 段、演讲 ' + mSpeech + ' 段出现（信件里未提及）';
+  } else {
+    eenTxt = '在语料里暂无出场';
+  }
 
   var h = '<div class="epath"><a href="#/">年表</a> · <a href="#/ents">实体</a> · ' +
     (kind === 'companies' ? '公司' : kind === 'concepts' ? '概念' : '人物') + '</div>' +
     '<h1 class="ename">' + esc(name) + '</h1>' +
-    '<div class="een">' + (e.en ? esc(e.en) + ' · ' : '') + '在 ' + years.length + ' 个年份、' + (ms.length + ov) + ' 段中出现</div>';
+    '<div class="een">' + (e.en ? esc(e.en) + ' · ' : '') + eenTxt + '</div>';
   if (e.summary) h += '<div class="esum">' + esc(e.summary) + '</div>';
 
   h += '<h2 class="h2">跨年出场 · 按时间排列</h2>';
