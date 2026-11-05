@@ -40,6 +40,9 @@ const MEM_FILE = process.env.AGENT_MEMORY_FILE
    另设一道全站每日上限：万一有人写脚本批量领额度，最多烧掉 FREE_DAY_MAX 问，
    之后当天只接受访客自带密钥。 */
 const QUOTA_FILE = path.join(ROOT, 'agent-quota.json');
+/* 会话内上下文落盘：前端 session 号存 localStorage 续得住，但服务一重启
+   SESSIONS 内存 Map 就清空，同一个号再进来也是一片空白。存 agent-sessions.json（不进 git）。 */
+const SESSION_FILE = path.join(ROOT, 'agent-sessions.json');
 const FREE_PER_VISITOR = 10;
 const FREE_DAY_MAX = 150;
 const DEEPSEEK = 'https://api.deepseek.com/chat/completions';
@@ -1450,15 +1453,57 @@ function withTimeout(p, ms, msg) {
   });
 }
 
-/* ---------------- 会话与长期记忆 ---------------- */
+/* ---------------- 会话与长期记忆 ----------------
+   会话（短期记忆）落盘：跟 agent-quota.json 一个套路——重启不清零。
+     loadSessions  开机读一次，把磁盘上的号恢复进内存 Map（太久没用的直接丢）
+     saveSessions  每答完一轮串行写一次，最多留 SESSION_MAX 个最近用过的会话 */
 const SESSIONS = new Map();
+const SESSION_MAX = 200;                    /* 防 agent-sessions.json 无限膨胀 */
+const SESSION_TTL = 3 * 24 * 3600 * 1000;   /* 三天没用到的会话，落盘时直接丢弃 */
+let _sessionLoaded = Promise.resolve();
+let _sessionsSave = Promise.resolve();
+
+async function loadSessions() {
+  try {
+    const j = JSON.parse(await fsp.readFile(SESSION_FILE, 'utf8'));
+    if (j && j.sessions) {
+      for (const id in j.sessions) {
+        const d = j.sessions[id];
+        if (!d || Date.now() - (d.at || 0) > SESSION_TTL) continue;
+        SESSIONS.set(id, { msgs: d.msgs || [], cited: d.cited || {}, stances: d.stances || [], at: d.at || 0 });
+      }
+    }
+  } catch (e) {}   /* 还没有这个文件 / 内容坏了：就从空会话开始，不挡服务起来 */
+}
+
+function saveSessions() {
+  /* 串行写入：两轮对话同时收尾时不能互相把对方的会话覆盖掉 */
+  _sessionsSave = _sessionsSave.then(async () => {
+    const ids = [...SESSIONS.keys()].filter(id => Date.now() - (SESSIONS.get(id).at || 0) <= SESSION_TTL);
+    ids.sort((a, b) => (SESSIONS.get(a).at || 0) - (SESSIONS.get(b).at || 0));
+    while (ids.length > SESSION_MAX) SESSIONS.delete(ids.shift());
+    const sessions = {};
+    ids.forEach(id => {
+      const s = SESSIONS.get(id);
+      sessions[id] = { msgs: s.msgs, cited: s.cited, stances: s.stances, at: s.at };
+    });
+    try { await fsp.writeFile(SESSION_FILE, JSON.stringify({ sessions }, null, 0), 'utf8'); } catch (e) {}
+  }).catch(() => {});
+  return _sessionsSave;
+}
+
 function getSession(id) {
   if (!SESSIONS.has(id)) SESSIONS.set(id, { msgs: [], cited: {}, stances: [] });
-  return SESSIONS.get(id);
+  const s = SESSIONS.get(id);
+  s.at = Date.now();   /* 打活跃时间戳：落盘时按它清太久没用的会话 */
+  return s;
 }
+
+_sessionLoaded = loadSessions();   /* 一进模块就恢复（listen 前的 require/评测也一样能用） */
 
 async function runAgent(ctx) {
   const { message, session, model, web, emit, key, mode } = ctx;
+  await _sessionLoaded;   /* 开机恢复没做完就来了第一个请求：等它读完再动会话 */
   const asOf = /^\d{4}(-\d{2}-\d{2})?$/.test(String(ctx.asOf || '')) ? String(ctx.asOf) : '';
   const anon = !!ctx.anon;
   /* 密钥由 emitSSE 按免费额度规则选好再传进来；这里只管报「确实没有」的情况 */
@@ -1611,6 +1656,7 @@ async function runAgent(ctx) {
 
   s.msgs.push({ role: 'assistant', content: final.content });
   if (s.msgs.length > 16) s.msgs = s.msgs.slice(-16);
+  saveSessions();   /* 这一轮对 msgs/stances/cited 的改动全部落盘，重启不丢 */
   return { rounds: rounds, calls: calls, usage: final.usage,
     spans: spans, ttft: ttft, ms: Date.now() - t0,
     answer: text, sources: used, all_sources: allSources };

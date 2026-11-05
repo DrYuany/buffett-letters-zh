@@ -6,6 +6,10 @@ _agent.key
 # agent 的长期记忆是本机的读者笔记，含个人偏好，不入库
 agent-memory.json
 
+# 会话内上下文落盘（多轮问答记录，含提问原文），不入库
+agent-sessions.json
+agent-memory.json
+
 # 免费额度账本（谁问过几问），本机/线上各自记账，不入库
 agent-quota.json
 
